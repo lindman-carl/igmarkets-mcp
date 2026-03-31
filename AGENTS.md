@@ -97,7 +97,7 @@ If the session expires, call `ig_refresh_token` (v3) or re-login.
 ### Session (8)
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `ig_login` | Login with OAuth v3 (recommended) |
 | `ig_login_v2` | Login with CST/security tokens (v2) |
 | `ig_logout` | End current session |
@@ -110,7 +110,7 @@ If the session expires, call `ig_refresh_token` (v3) or re-login.
 ### Accounts (9)
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `ig_accounts` | List all accounts |
 | `ig_preferences` | Get account preferences |
 | `ig_update_preferences` | Update account preferences |
@@ -124,7 +124,7 @@ If the session expires, call `ig_refresh_token` (v3) or re-login.
 ### Dealing (10)
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `ig_deal_confirmation` | Check outcome of a trade operation |
 | `ig_positions` | List all open positions |
 | `ig_position` | Get single position by dealId |
@@ -139,7 +139,7 @@ If the session expires, call `ig_refresh_token` (v3) or re-login.
 ### Markets (8)
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `ig_categories` | List market categories (top-level navigation) |
 | `ig_category_instruments` | List instruments in a category |
 | `ig_markets` | Get details for multiple markets (by epic list) |
@@ -152,7 +152,7 @@ If the session expires, call `ig_refresh_token` (v3) or re-login.
 ### Watchlists (6)
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `ig_watchlists` | List all watchlists |
 | `ig_create_watchlist` | Create a new watchlist |
 | `ig_watchlist` | Get instruments in a watchlist |
@@ -163,7 +163,7 @@ If the session expires, call `ig_refresh_token` (v3) or re-login.
 ### Sentiment (3)
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `ig_client_sentiment_bulk` | Sentiment for multiple markets |
 | `ig_client_sentiment` | Sentiment for a single market |
 | `ig_related_sentiment` | Sentiment for related markets |
@@ -171,7 +171,7 @@ If the session expires, call `ig_refresh_token` (v3) or re-login.
 ### General (9)
 
 | Tool | Description |
-|------|-------------|
+| ------ | ------------- |
 | `ig_costs_open` | Get costs/charges for opening a position |
 | `ig_costs_close` | Get costs/charges for closing a position |
 | `ig_costs_edit` | Get costs/charges for editing a position |
