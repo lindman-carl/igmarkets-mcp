@@ -22,6 +22,7 @@ prefixed with `ig_`.
 ## Authentication Flow
 
 The server auto-logs in at startup if these environment variables are set:
+
 - `IG_API_KEY` - IG Markets API key
 - `IG_USERNAME` - IG account username
 - `IG_PASSWORD` - IG account password
@@ -34,11 +35,13 @@ If the session expires, call `ig_refresh_token` (v3) or re-login.
 ## Common Workflows
 
 ### Look up a market
+
 1. `ig_search_markets` with a search term (e.g. "AAPL", "FTSE", "Tesla")
 2. Note the `epic` from results (e.g. "IX.D.FTSE.DAILY.IP")
 3. `ig_market` with the epic for full instrument details (min deal size, margin, hours)
 
 ### Open a position
+
 1. Search for the market and get the `epic`
 2. `ig_market` to check instrument details (expiry, min size, currency)
 3. Confirm trade details with the user
@@ -48,6 +51,7 @@ If the session expires, call `ig_refresh_token` (v3) or re-login.
 6. Report whether it was OPEN (accepted) or REJECTED
 
 ### Close a position
+
 1. `ig_positions` to list open positions
 2. Identify the position to close (note dealId, direction, size)
 3. Confirm with user
@@ -55,23 +59,27 @@ If the session expires, call `ig_refresh_token` (v3) or re-login.
 5. `ig_deal_confirmation` to verify
 
 ### Monitor positions
+
 1. `ig_positions` - all open positions with P&L
 2. `ig_position` - single position by dealId
 3. `ig_update_position` - adjust stops/limits on an existing position
 
 ### Working orders (limit/stop orders)
+
 1. `ig_working_orders` - list pending orders
 2. `ig_create_working_order` - place a limit or stop order
 3. `ig_update_working_order` - modify level, stops, limits
 4. `ig_delete_working_order` - cancel an order
 
 ### Account & history
+
 1. `ig_accounts` - list all accounts (demo, live, sub-accounts)
 2. `ig_activity_history` - recent trading activity (v3 paged)
 3. `ig_transaction_history` - transaction records (v2 paged)
 4. `ig_preferences` / `ig_update_preferences` - trailing stops default etc.
 
 ### Price data
+
 1. `ig_prices` - default price snapshot for an epic + resolution
 2. `ig_prices_points` - last N data points
 3. `ig_prices_range` - prices between two dates
@@ -79,6 +87,7 @@ If the session expires, call `ig_refresh_token` (v3) or re-login.
    MINUTE_15, MINUTE_30, HOUR, HOUR_2, HOUR_3, HOUR_4, DAY, WEEK, MONTH
 
 ### Market sentiment
+
 1. `ig_client_sentiment` - bull/bear % for a single market
 2. `ig_client_sentiment_bulk` - sentiment for multiple markets at once
 3. `ig_related_sentiment` - sentiment for related markets
@@ -86,6 +95,7 @@ If the session expires, call `ig_refresh_token` (v3) or re-login.
 ## All 53 Tools
 
 ### Session (8)
+
 | Tool | Description |
 |------|-------------|
 | `ig_login` | Login with OAuth v3 (recommended) |
@@ -98,6 +108,7 @@ If the session expires, call `ig_refresh_token` (v3) or re-login.
 | `ig_session_status` | Check auth status (local, no API call) |
 
 ### Accounts (9)
+
 | Tool | Description |
 |------|-------------|
 | `ig_accounts` | List all accounts |
@@ -111,6 +122,7 @@ If the session expires, call `ig_refresh_token` (v3) or re-login.
 | `ig_transaction_history_period` | Transactions by period (v1) |
 
 ### Dealing (10)
+
 | Tool | Description |
 |------|-------------|
 | `ig_deal_confirmation` | Check outcome of a trade operation |
@@ -125,6 +137,7 @@ If the session expires, call `ig_refresh_token` (v3) or re-login.
 | `ig_update_working_order` | Modify a working order |
 
 ### Markets (8)
+
 | Tool | Description |
 |------|-------------|
 | `ig_categories` | List market categories (top-level navigation) |
@@ -137,6 +150,7 @@ If the session expires, call `ig_refresh_token` (v3) or re-login.
 | `ig_prices_range` | Prices between two dates |
 
 ### Watchlists (6)
+
 | Tool | Description |
 |------|-------------|
 | `ig_watchlists` | List all watchlists |
@@ -147,6 +161,7 @@ If the session expires, call `ig_refresh_token` (v3) or re-login.
 | `ig_watchlist_remove_market` | Remove a market from a watchlist |
 
 ### Sentiment (3)
+
 | Tool | Description |
 |------|-------------|
 | `ig_client_sentiment_bulk` | Sentiment for multiple markets |
@@ -154,6 +169,7 @@ If the session expires, call `ig_refresh_token` (v3) or re-login.
 | `ig_related_sentiment` | Sentiment for related markets |
 
 ### General (9)
+
 | Tool | Description |
 |------|-------------|
 | `ig_costs_open` | Get costs/charges for opening a position |
