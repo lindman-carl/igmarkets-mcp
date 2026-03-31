@@ -1,17 +1,36 @@
 {
-  "name": "igmarkets-mcp",
+  "name": "openclaw-plugin-igmarkets",
   "version": "1.0.0",
-  "description": "MCP server for IG Markets REST Trading API",
+  "description": "OpenClaw plugin for IG Markets REST Trading API - 53 tools for trading, market data, and account management",
   "type": "module",
-  "main": "dist/server.js",
+  "main": "dist/index.js",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lindman-carl/igmarkets-mcp"
+  },
+  "keywords": ["openclaw", "openclaw-plugin", "ig-markets", "trading", "cfd", "spread-bet"],
+  "files": ["dist/", "openclaw.plugin.json", "skills/", "README.md"],
+  "openclaw": {
+    "extensions": ["./index.ts"],
+    "compat": {
+      "pluginApi": ">=2026.3.24-beta.2",
+      "minGatewayVersion": "2026.3.24-beta.2"
+    },
+    "build": {
+      "openclawVersion": "2026.3.24-beta.2",
+      "pluginSdkVersion": "2026.3.24-beta.2"
+    }
+  },
   "scripts": {
     "build": "tsc",
-    "start": "node --env-file .env dist/server.js",
-    "dev": "tsx --env-file .env src/server.ts"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.29.0",
-    "zod": "4.3.6"
+    "@sinclair/typebox": "^0.34.0"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.3.24-beta.2"
   },
   "devDependencies": {
     "@types/node": "25.5.0",

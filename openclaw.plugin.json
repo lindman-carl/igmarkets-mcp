@@ -1,0 +1,61 @@
+{
+  "id": "igmarkets",
+  "name": "IG Markets Trading",
+  "description": "Trade stocks, CFDs, and spread bets via the IG Markets REST API. 53 tools for authentication, positions, orders, market data, watchlists, sentiment, and more.",
+  "version": "1.0.0",
+  "contracts": {
+    "tools": [
+      "ig_login", "ig_login_v2", "ig_logout", "ig_session_details",
+      "ig_switch_account", "ig_refresh_token", "ig_encryption_key", "ig_session_status",
+      "ig_accounts", "ig_preferences", "ig_update_preferences",
+      "ig_activity_history", "ig_activity_history_range", "ig_activity_history_period",
+      "ig_transaction_history", "ig_transaction_history_range", "ig_transaction_history_period",
+      "ig_deal_confirmation", "ig_positions", "ig_position",
+      "ig_create_position", "ig_close_position", "ig_update_position",
+      "ig_working_orders", "ig_create_working_order", "ig_delete_working_order", "ig_update_working_order",
+      "ig_categories", "ig_category_instruments", "ig_markets", "ig_market",
+      "ig_search_markets", "ig_prices", "ig_prices_points", "ig_prices_range",
+      "ig_watchlists", "ig_create_watchlist", "ig_watchlist",
+      "ig_delete_watchlist", "ig_watchlist_add_market", "ig_watchlist_remove_market",
+      "ig_client_sentiment_bulk", "ig_client_sentiment", "ig_related_sentiment",
+      "ig_costs_open", "ig_costs_close", "ig_costs_edit", "ig_costs_pdf", "ig_costs_history",
+      "ig_applications", "ig_update_application", "ig_disable_application",
+      "ig_repeat_deal_window"
+    ]
+  },
+  "skills": ["./skills/igmarkets"],
+  "uiHints": {
+    "apiKey": {
+      "label": "IG API Key",
+      "placeholder": "Your IG Markets API key",
+      "sensitive": true
+    },
+    "password": {
+      "label": "IG Password",
+      "sensitive": true
+    },
+    "username": {
+      "label": "IG Username",
+      "placeholder": "Your IG Markets username"
+    },
+    "isDemo": {
+      "label": "Demo Mode",
+      "help": "Use the IG demo environment (default: true for safety)"
+    },
+    "tradeApproval": {
+      "label": "Require Trade Approval",
+      "help": "Prompt for user approval before executing trades (default: true)"
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "apiKey": { "type": "string" },
+      "username": { "type": "string" },
+      "password": { "type": "string" },
+      "isDemo": { "type": "boolean", "default": true },
+      "tradeApproval": { "type": "boolean", "default": true }
+    }
+  }
+}

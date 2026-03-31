@@ -13,120 +13,136 @@
  *   GET  /repeat-dealing-window                         (v1) - Repeat deal window
  */
 
-import { z } from "zod";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { Type } from "@sinclair/typebox";
+import type { OpenClawPluginApi } from "../types/openclaw.js";
 import { getClient } from "../ig-client.js";
 
-export function registerGeneralTools(server: McpServer): void {
+const DirectionType = Type.Union(
+  [Type.Literal("BUY"), Type.Literal("SELL")],
+  { description: "Direction" }
+);
+
+const OrderTypeType = Type.Union(
+  [Type.Literal("MARKET"), Type.Literal("LIMIT"), Type.Literal("QUOTE")],
+  { description: "Order type" }
+);
+
+export function registerGeneralTools(api: OpenClawPluginApi): void {
   // ---------------------------------------------------------------------------
   // ig_costs_open - Indicative costs at opening
   // ---------------------------------------------------------------------------
-  server.registerTool(
-    "ig_costs_open",
-    {
-      title: "IG Costs (Open)",
-      description:
-        "Returns indicative costs and charges for opening a position. " +
-        "Supported for EU regulated entities.",
-      inputSchema: {
-        epic: z.string().describe("Instrument epic identifier"),
-        direction: z.enum(["BUY", "SELL"]).describe("Direction"),
-        size: z.number().describe("Deal size"),
-        orderType: z.enum(["MARKET", "LIMIT", "QUOTE"]).describe("Order type"),
-        currencyCode: z.string().describe("Currency code"),
-        expiry: z.string().optional().describe("Instrument expiry"),
-        level: z.number().optional().describe("Deal level"),
-      },
-    },
-    async (args) => {
+  api.registerTool({
+    name: "ig_costs_open",
+    description:
+      "Returns indicative costs and charges for opening a position. " +
+      "Supported for EU regulated entities.",
+    parameters: Type.Object({
+      epic: Type.String({ description: "Instrument epic identifier" }),
+      direction: DirectionType,
+      size: Type.Number({ description: "Deal size" }),
+      orderType: OrderTypeType,
+      currencyCode: Type.String({ description: "Currency code" }),
+      expiry: Type.Optional(
+        Type.String({ description: "Instrument expiry" })
+      ),
+      level: Type.Optional(
+        Type.Number({ description: "Deal level" })
+      ),
+    }),
+    async execute(_id, params) {
       const client = getClient();
-      const result = await client.request("POST", "/indicativecostsandcharges/open", {
-        version: "1",
-        body: args,
-      });
+      const result = await client.request(
+        "POST",
+        "/indicativecostsandcharges/open",
+        { version: "1", body: params }
+      );
       return {
-        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       };
-    }
-  );
+    },
+  });
 
   // ---------------------------------------------------------------------------
   // ig_costs_close - Indicative costs at closing
   // ---------------------------------------------------------------------------
-  server.registerTool(
-    "ig_costs_close",
-    {
-      title: "IG Costs (Close)",
-      description: "Returns indicative costs and charges for closing a position.",
-      inputSchema: {
-        epic: z.string().describe("Instrument epic identifier"),
-        direction: z.enum(["BUY", "SELL"]).describe("Direction"),
-        size: z.number().describe("Deal size"),
-        orderType: z.enum(["MARKET", "LIMIT", "QUOTE"]).describe("Order type"),
-        currencyCode: z.string().describe("Currency code"),
-        expiry: z.string().optional().describe("Instrument expiry"),
-        level: z.number().optional().describe("Deal level"),
-      },
-    },
-    async (args) => {
+  api.registerTool({
+    name: "ig_costs_close",
+    description:
+      "Returns indicative costs and charges for closing a position.",
+    parameters: Type.Object({
+      epic: Type.String({ description: "Instrument epic identifier" }),
+      direction: DirectionType,
+      size: Type.Number({ description: "Deal size" }),
+      orderType: OrderTypeType,
+      currencyCode: Type.String({ description: "Currency code" }),
+      expiry: Type.Optional(
+        Type.String({ description: "Instrument expiry" })
+      ),
+      level: Type.Optional(
+        Type.Number({ description: "Deal level" })
+      ),
+    }),
+    async execute(_id, params) {
       const client = getClient();
-      const result = await client.request("POST", "/indicativecostsandcharges/close", {
-        version: "1",
-        body: args,
-      });
+      const result = await client.request(
+        "POST",
+        "/indicativecostsandcharges/close",
+        { version: "1", body: params }
+      );
       return {
-        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       };
-    }
-  );
+    },
+  });
 
   // ---------------------------------------------------------------------------
   // ig_costs_edit - Indicative costs for editing an order
   // ---------------------------------------------------------------------------
-  server.registerTool(
-    "ig_costs_edit",
-    {
-      title: "IG Costs (Edit)",
-      description: "Returns indicative costs and charges for editing an order.",
-      inputSchema: {
-        epic: z.string().describe("Instrument epic identifier"),
-        direction: z.enum(["BUY", "SELL"]).describe("Direction"),
-        size: z.number().describe("Deal size"),
-        orderType: z.enum(["MARKET", "LIMIT", "QUOTE"]).describe("Order type"),
-        currencyCode: z.string().describe("Currency code"),
-        expiry: z.string().optional().describe("Instrument expiry"),
-        level: z.number().optional().describe("Deal level"),
-      },
-    },
-    async (args) => {
+  api.registerTool({
+    name: "ig_costs_edit",
+    description:
+      "Returns indicative costs and charges for editing an order.",
+    parameters: Type.Object({
+      epic: Type.String({ description: "Instrument epic identifier" }),
+      direction: DirectionType,
+      size: Type.Number({ description: "Deal size" }),
+      orderType: OrderTypeType,
+      currencyCode: Type.String({ description: "Currency code" }),
+      expiry: Type.Optional(
+        Type.String({ description: "Instrument expiry" })
+      ),
+      level: Type.Optional(
+        Type.Number({ description: "Deal level" })
+      ),
+    }),
+    async execute(_id, params) {
       const client = getClient();
-      const result = await client.request("POST", "/indicativecostsandcharges/edit", {
-        version: "1",
-        body: args,
-      });
+      const result = await client.request(
+        "POST",
+        "/indicativecostsandcharges/edit",
+        { version: "1", body: params }
+      );
       return {
-        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       };
-    }
-  );
+    },
+  });
 
   // ---------------------------------------------------------------------------
   // ig_costs_pdf - Download indicative costs as PDF
   // ---------------------------------------------------------------------------
-  server.registerTool(
-    "ig_costs_pdf",
-    {
-      title: "IG Costs PDF",
-      description:
-        "Downloads a previously generated indicative costs and charges quote as a PDF. " +
-        "Returns the quote reference info (actual PDF download requires browser).",
-      inputSchema: {
-        indicativeQuoteReference: z
-          .string()
-          .describe("Reference from a previous costs request"),
-      },
-    },
-    async ({ indicativeQuoteReference }) => {
+  api.registerTool({
+    name: "ig_costs_pdf",
+    description:
+      "Downloads a previously generated indicative costs and charges quote as a PDF. " +
+      "Returns the quote reference info (actual PDF download requires browser).",
+    parameters: Type.Object({
+      indicativeQuoteReference: Type.String({
+        description: "Reference from a previous costs request",
+      }),
+    }),
+    async execute(_id, params) {
+      const { indicativeQuoteReference } = params;
       const client = getClient();
       const result = await client.request(
         "GET",
@@ -136,7 +152,7 @@ export function registerGeneralTools(server: McpServer): void {
       return {
         content: [
           {
-            type: "text" as const,
+            type: "text",
             text:
               typeof result === "string"
                 ? `PDF data returned (${result.length} bytes). Save to file to view.`
@@ -144,23 +160,22 @@ export function registerGeneralTools(server: McpServer): void {
           },
         ],
       };
-    }
-  );
+    },
+  });
 
   // ---------------------------------------------------------------------------
   // ig_costs_history - Cost and charges history by date range
   // ---------------------------------------------------------------------------
-  server.registerTool(
-    "ig_costs_history",
-    {
-      title: "IG Costs History",
-      description: "Returns indicative costs and charges history for a date range.",
-      inputSchema: {
-        from: z.string().describe("Start date (yyyy-MM-dd)"),
-        to: z.string().describe("End date (yyyy-MM-dd)"),
-      },
-    },
-    async ({ from, to }) => {
+  api.registerTool({
+    name: "ig_costs_history",
+    description:
+      "Returns indicative costs and charges history for a date range.",
+    parameters: Type.Object({
+      from: Type.String({ description: "Start date (yyyy-MM-dd)" }),
+      to: Type.String({ description: "End date (yyyy-MM-dd)" }),
+    }),
+    async execute(_id, params) {
+      const { from, to } = params;
       const client = getClient();
       const result = await client.request(
         "GET",
@@ -168,104 +183,109 @@ export function registerGeneralTools(server: McpServer): void {
         { version: "1" }
       );
       return {
-        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       };
-    }
-  );
+    },
+  });
 
   // ---------------------------------------------------------------------------
   // ig_applications - List client applications
   // ---------------------------------------------------------------------------
-  server.registerTool(
-    "ig_applications",
-    {
-      title: "IG List Applications",
-      description: "Returns a list of client-owned API applications.",
-      inputSchema: {},
-    },
-    async () => {
+  api.registerTool({
+    name: "ig_applications",
+    description: "Returns a list of client-owned API applications.",
+    parameters: Type.Object({}),
+    async execute(_id, _params) {
       const client = getClient();
       const result = await client.request("GET", "/operations/application", {
         version: "1",
       });
       return {
-        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       };
-    }
-  );
+    },
+  });
 
   // ---------------------------------------------------------------------------
   // ig_update_application - Update application details
   // ---------------------------------------------------------------------------
-  server.registerTool(
-    "ig_update_application",
-    {
-      title: "IG Update Application",
-      description: "Alters the details of a given user application.",
-      inputSchema: {
-        allowanceAccountOverall: z.number().optional().describe("Overall account allowance"),
-        allowanceAccountTrading: z.number().optional().describe("Trading allowance"),
-        allowanceAccountHistoricalData: z
-          .number()
-          .optional()
-          .describe("Historical data allowance"),
-        apiKey: z.string().optional().describe("API key to update"),
-        status: z.enum(["ENABLED", "DISABLED", "REVOKED"]).optional().describe("Application status"),
-      },
-    },
-    async (args) => {
+  api.registerTool({
+    name: "ig_update_application",
+    description: "Alters the details of a given user application.",
+    parameters: Type.Object({
+      allowanceAccountOverall: Type.Optional(
+        Type.Number({ description: "Overall account allowance" })
+      ),
+      allowanceAccountTrading: Type.Optional(
+        Type.Number({ description: "Trading allowance" })
+      ),
+      allowanceAccountHistoricalData: Type.Optional(
+        Type.Number({ description: "Historical data allowance" })
+      ),
+      apiKey: Type.Optional(
+        Type.String({ description: "API key to update" })
+      ),
+      status: Type.Optional(
+        Type.Union(
+          [
+            Type.Literal("ENABLED"),
+            Type.Literal("DISABLED"),
+            Type.Literal("REVOKED"),
+          ],
+          { description: "Application status" }
+        )
+      ),
+    }),
+    async execute(_id, params) {
       const client = getClient();
       const result = await client.request("PUT", "/operations/application", {
         version: "1",
-        body: args,
+        body: params,
       });
       return {
-        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       };
-    }
-  );
+    },
+  });
 
   // ---------------------------------------------------------------------------
   // ig_disable_application - Disable current API key
   // ---------------------------------------------------------------------------
-  server.registerTool(
-    "ig_disable_application",
-    {
-      title: "IG Disable Application",
-      description:
-        "Disables the current application API key from processing further requests. " +
-        "WARNING: The key can only be re-enabled via the IG web platform.",
-      inputSchema: {},
-    },
-    async () => {
+  api.registerTool({
+    name: "ig_disable_application",
+    description:
+      "Disables the current application API key from processing further requests. " +
+      "WARNING: The key can only be re-enabled via the IG web platform.",
+    parameters: Type.Object({}),
+    async execute(_id, _params) {
       const client = getClient();
-      const result = await client.request("PUT", "/operations/application/disable", {
-        version: "1",
-      });
+      const result = await client.request(
+        "PUT",
+        "/operations/application/disable",
+        { version: "1" }
+      );
       return {
-        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       };
-    }
-  );
+    },
+  });
 
   // ---------------------------------------------------------------------------
   // ig_repeat_deal_window - Get repeat deal window status
   // ---------------------------------------------------------------------------
-  server.registerTool(
-    "ig_repeat_deal_window",
-    {
-      title: "IG Repeat Deal Window",
-      description: "Returns the current repeat deal window status of the account.",
-      inputSchema: {},
-    },
-    async () => {
+  api.registerTool({
+    name: "ig_repeat_deal_window",
+    description:
+      "Returns the current repeat deal window status of the account.",
+    parameters: Type.Object({}),
+    async execute(_id, _params) {
       const client = getClient();
       const result = await client.request("GET", "/repeat-dealing-window", {
         version: "1",
       });
       return {
-        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       };
-    }
-  );
+    },
+  });
 }
