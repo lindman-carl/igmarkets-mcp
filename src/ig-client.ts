@@ -81,6 +81,8 @@ export class IGClient {
     const data = await res.json();
 
     this.session = {
+      cst: res.headers.get("CST") ?? undefined,
+      securityToken: res.headers.get("X-SECURITY-TOKEN") ?? undefined,
       oauth: data.oauthToken,
       accountId: data.accountId,
       clientId: data.clientId,
@@ -211,6 +213,9 @@ export class IGClient {
     }
     if (this.session.securityToken) {
       headers["X-SECURITY-TOKEN"] = this.session.securityToken;
+    }
+    if (this.session.accountId) {
+      headers["IG-ACCOUNT-ID"] = this.session.accountId;
     }
 
     // IG's DELETE endpoints accept body via _method override
