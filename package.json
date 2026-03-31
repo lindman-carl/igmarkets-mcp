@@ -9,10 +9,24 @@
     "type": "git",
     "url": "https://github.com/lindman-carl/igmarkets-mcp"
   },
-  "keywords": ["openclaw", "openclaw-plugin", "ig-markets", "trading", "cfd", "spread-bet"],
-  "files": ["dist/", "openclaw.plugin.json", "skills/", "README.md"],
+  "keywords": [
+    "openclaw",
+    "openclaw-plugin",
+    "ig-markets",
+    "trading",
+    "cfd",
+    "spread-bet"
+  ],
+  "files": [
+    "dist/",
+    "openclaw.plugin.json",
+    "skills/",
+    "README.md"
+  ],
   "openclaw": {
-    "extensions": ["./index.ts"],
+    "extensions": [
+      "./index.ts"
+    ],
     "compat": {
       "pluginApi": ">=2026.3.24-beta.2",
       "minGatewayVersion": "2026.3.24-beta.2"
@@ -24,7 +38,9 @@
   },
   "scripts": {
     "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@sinclair/typebox": "^0.34.0"
@@ -34,6 +50,7 @@
   },
   "devDependencies": {
     "@types/node": "25.5.0",
+    "prettier": "3.8.1",
     "tsx": "4.21.0",
     "typescript": "6.0.2"
   }

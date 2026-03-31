@@ -35,11 +35,9 @@ export function registerDealingTools(api: OpenClawPluginApi): void {
     async execute(_id, params) {
       const { dealReference } = params;
       const client = getClient();
-      const result = await client.request(
-        "GET",
-        `/confirms/${dealReference}`,
-        { version: "1" }
-      );
+      const result = await client.request("GET", `/confirms/${dealReference}`, {
+        version: "1",
+      });
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       };
@@ -101,10 +99,9 @@ export function registerDealingTools(api: OpenClawPluginApi): void {
       epic: Type.String({
         description: "Instrument epic identifier (e.g. 'IX.D.FTSE.DAILY.IP')",
       }),
-      direction: Type.Union(
-        [Type.Literal("BUY"), Type.Literal("SELL")],
-        { description: "Deal direction" }
-      ),
+      direction: Type.Union([Type.Literal("BUY"), Type.Literal("SELL")], {
+        description: "Deal direction",
+      }),
       size: Type.Number({ description: "Deal size" }),
       expiry: Type.String({
         description: "Instrument expiry (e.g. 'DFB', '-', 'SEP-25')",
@@ -120,59 +117,50 @@ export function registerDealingTools(api: OpenClawPluginApi): void {
         description: "True if a guaranteed stop is required",
       }),
       orderType: Type.Union(
-        [
-          Type.Literal("MARKET"),
-          Type.Literal("LIMIT"),
-          Type.Literal("QUOTE"),
-        ],
+        [Type.Literal("MARKET"), Type.Literal("LIMIT"), Type.Literal("QUOTE")],
         {
           description:
             "Order type: MARKET (no level needed), LIMIT (level required), QUOTE (level+quoteId)",
-        }
+        },
       ),
       level: Type.Optional(
-        Type.Number({ description: "Deal level (required for LIMIT/QUOTE)" })
+        Type.Number({ description: "Deal level (required for LIMIT/QUOTE)" }),
       ),
       quoteId: Type.Optional(
         Type.String({
           description: "Lightstreamer quote ID (required for QUOTE)",
-        })
+        }),
       ),
       limitLevel: Type.Optional(
-        Type.Number({ description: "Take-profit limit level" })
+        Type.Number({ description: "Take-profit limit level" }),
       ),
       limitDistance: Type.Optional(
         Type.Number({
           description: "Take-profit limit distance (alternative to limitLevel)",
-        })
+        }),
       ),
-      stopLevel: Type.Optional(
-        Type.Number({ description: "Stop-loss level" })
-      ),
+      stopLevel: Type.Optional(Type.Number({ description: "Stop-loss level" })),
       stopDistance: Type.Optional(
         Type.Number({
           description: "Stop-loss distance (alternative to stopLevel)",
-        })
+        }),
       ),
       trailingStop: Type.Optional(
-        Type.Boolean({ description: "Enable trailing stop" })
+        Type.Boolean({ description: "Enable trailing stop" }),
       ),
       trailingStopIncrement: Type.Optional(
-        Type.Number({ description: "Trailing stop increment in pips" })
+        Type.Number({ description: "Trailing stop increment in pips" }),
       ),
       timeInForce: Type.Optional(
         Type.Union(
-          [
-            Type.Literal("EXECUTE_AND_ELIMINATE"),
-            Type.Literal("FILL_OR_KILL"),
-          ],
-          { description: "Time in force" }
-        )
+          [Type.Literal("EXECUTE_AND_ELIMINATE"), Type.Literal("FILL_OR_KILL")],
+          { description: "Time in force" },
+        ),
       ),
       dealReference: Type.Optional(
         Type.String({
           description: "User-defined deal reference (max 30 chars)",
-        })
+        }),
       ),
     }),
     async execute(_id, params) {
@@ -197,43 +185,35 @@ export function registerDealingTools(api: OpenClawPluginApi): void {
       "Returns a deal reference.",
     parameters: Type.Object({
       dealId: Type.Optional(
-        Type.String({ description: "Deal ID to close (use this OR epic)" })
+        Type.String({ description: "Deal ID to close (use this OR epic)" }),
       ),
       epic: Type.Optional(
-        Type.String({ description: "Instrument epic (use this OR dealId)" })
+        Type.String({ description: "Instrument epic (use this OR dealId)" }),
       ),
       expiry: Type.Optional(
         Type.String({
           description: "Instrument expiry (required if using epic)",
-        })
+        }),
       ),
-      direction: Type.Union(
-        [Type.Literal("BUY"), Type.Literal("SELL")],
-        { description: "Opposite direction to the open position" }
-      ),
+      direction: Type.Union([Type.Literal("BUY"), Type.Literal("SELL")], {
+        description: "Opposite direction to the open position",
+      }),
       size: Type.Number({ description: "Size to close" }),
       orderType: Type.Union(
-        [
-          Type.Literal("MARKET"),
-          Type.Literal("LIMIT"),
-          Type.Literal("QUOTE"),
-        ],
-        { description: "Order type" }
+        [Type.Literal("MARKET"), Type.Literal("LIMIT"), Type.Literal("QUOTE")],
+        { description: "Order type" },
       ),
       level: Type.Optional(
-        Type.Number({ description: "Close level (for LIMIT/QUOTE)" })
+        Type.Number({ description: "Close level (for LIMIT/QUOTE)" }),
       ),
       quoteId: Type.Optional(
-        Type.String({ description: "Quote ID (for QUOTE)" })
+        Type.String({ description: "Quote ID (for QUOTE)" }),
       ),
       timeInForce: Type.Optional(
         Type.Union(
-          [
-            Type.Literal("EXECUTE_AND_ELIMINATE"),
-            Type.Literal("FILL_OR_KILL"),
-          ],
-          { description: "Time in force" }
-        )
+          [Type.Literal("EXECUTE_AND_ELIMINATE"), Type.Literal("FILL_OR_KILL")],
+          { description: "Time in force" },
+        ),
       ),
     }),
     async execute(_id, params) {
@@ -260,33 +240,30 @@ export function registerDealingTools(api: OpenClawPluginApi): void {
       dealId: Type.String({
         description: "Deal identifier of the position to update",
       }),
-      stopLevel: Type.Optional(
-        Type.Number({ description: "New stop level" })
-      ),
+      stopLevel: Type.Optional(Type.Number({ description: "New stop level" })),
       limitLevel: Type.Optional(
-        Type.Number({ description: "New limit level" })
+        Type.Number({ description: "New limit level" }),
       ),
       trailingStop: Type.Optional(
-        Type.Boolean({ description: "Enable/disable trailing stop" })
+        Type.Boolean({ description: "Enable/disable trailing stop" }),
       ),
       trailingStopDistance: Type.Optional(
-        Type.Number({ description: "Trailing stop distance" })
+        Type.Number({ description: "Trailing stop distance" }),
       ),
       trailingStopIncrement: Type.Optional(
-        Type.Number({ description: "Trailing stop increment" })
+        Type.Number({ description: "Trailing stop increment" }),
       ),
       guaranteedStop: Type.Optional(
-        Type.Boolean({ description: "Enable guaranteed stop" })
+        Type.Boolean({ description: "Enable guaranteed stop" }),
       ),
     }),
     async execute(_id, params) {
       const { dealId, ...body } = params;
       const client = getClient();
-      const result = await client.request(
-        "PUT",
-        `/positions/otc/${dealId}`,
-        { version: "2", body }
-      );
+      const result = await client.request("PUT", `/positions/otc/${dealId}`, {
+        version: "2",
+        body,
+      });
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       };
@@ -321,16 +298,14 @@ export function registerDealingTools(api: OpenClawPluginApi): void {
       "Use GOOD_TILL_CANCELLED or GOOD_TILL_DATE for time in force.",
     parameters: Type.Object({
       epic: Type.String({ description: "Instrument epic identifier" }),
-      direction: Type.Union(
-        [Type.Literal("BUY"), Type.Literal("SELL")],
-        { description: "Direction" }
-      ),
+      direction: Type.Union([Type.Literal("BUY"), Type.Literal("SELL")], {
+        description: "Direction",
+      }),
       size: Type.Number({ description: "Order size" }),
       level: Type.Number({ description: "Order trigger level" }),
-      type: Type.Union(
-        [Type.Literal("LIMIT"), Type.Literal("STOP")],
-        { description: "Working order type" }
-      ),
+      type: Type.Union([Type.Literal("LIMIT"), Type.Literal("STOP")], {
+        description: "Working order type",
+      }),
       currencyCode: Type.String({
         description: "Currency code (e.g. 'GBP')",
       }),
@@ -341,35 +316,26 @@ export function registerDealingTools(api: OpenClawPluginApi): void {
         description: "Whether a guaranteed stop is required",
       }),
       timeInForce: Type.Union(
-        [
-          Type.Literal("GOOD_TILL_CANCELLED"),
-          Type.Literal("GOOD_TILL_DATE"),
-        ],
-        { description: "Time in force" }
+        [Type.Literal("GOOD_TILL_CANCELLED"), Type.Literal("GOOD_TILL_DATE")],
+        { description: "Time in force" },
       ),
       goodTillDate: Type.Optional(
         Type.String({
           description:
             "Expiry date for GOOD_TILL_DATE (yyyy/mm/dd hh:mm:ss UTC or Unix ms)",
-        })
+        }),
       ),
-      forceOpen: Type.Optional(
-        Type.Boolean({ description: "Force open" })
-      ),
-      limitLevel: Type.Optional(
-        Type.Number({ description: "Limit level" })
-      ),
+      forceOpen: Type.Optional(Type.Boolean({ description: "Force open" })),
+      limitLevel: Type.Optional(Type.Number({ description: "Limit level" })),
       limitDistance: Type.Optional(
-        Type.Number({ description: "Limit distance" })
+        Type.Number({ description: "Limit distance" }),
       ),
-      stopLevel: Type.Optional(
-        Type.Number({ description: "Stop level" })
-      ),
+      stopLevel: Type.Optional(Type.Number({ description: "Stop level" })),
       stopDistance: Type.Optional(
-        Type.Number({ description: "Stop distance" })
+        Type.Number({ description: "Stop distance" }),
       ),
       dealReference: Type.Optional(
-        Type.String({ description: "User-defined reference" })
+        Type.String({ description: "User-defined reference" }),
       ),
     }),
     async execute(_id, params) {
@@ -401,7 +367,7 @@ export function registerDealingTools(api: OpenClawPluginApi): void {
       const result = await client.request(
         "DELETE",
         `/working-orders/otc/${dealId}`,
-        { version: "2" }
+        { version: "2" },
       );
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
@@ -421,34 +387,26 @@ export function registerDealingTools(api: OpenClawPluginApi): void {
         description: "Deal identifier of the working order",
       }),
       level: Type.Number({ description: "New order level" }),
-      type: Type.Union(
-        [Type.Literal("LIMIT"), Type.Literal("STOP")],
-        { description: "Working order type" }
-      ),
+      type: Type.Union([Type.Literal("LIMIT"), Type.Literal("STOP")], {
+        description: "Working order type",
+      }),
       timeInForce: Type.Union(
-        [
-          Type.Literal("GOOD_TILL_CANCELLED"),
-          Type.Literal("GOOD_TILL_DATE"),
-        ],
-        { description: "Time in force" }
+        [Type.Literal("GOOD_TILL_CANCELLED"), Type.Literal("GOOD_TILL_DATE")],
+        { description: "Time in force" },
       ),
       goodTillDate: Type.Optional(
-        Type.String({ description: "Expiry date for GOOD_TILL_DATE" })
+        Type.String({ description: "Expiry date for GOOD_TILL_DATE" }),
       ),
       guaranteedStop: Type.Optional(
-        Type.Boolean({ description: "Guaranteed stop" })
+        Type.Boolean({ description: "Guaranteed stop" }),
       ),
-      limitLevel: Type.Optional(
-        Type.Number({ description: "Limit level" })
-      ),
+      limitLevel: Type.Optional(Type.Number({ description: "Limit level" })),
       limitDistance: Type.Optional(
-        Type.Number({ description: "Limit distance" })
+        Type.Number({ description: "Limit distance" }),
       ),
-      stopLevel: Type.Optional(
-        Type.Number({ description: "Stop level" })
-      ),
+      stopLevel: Type.Optional(Type.Number({ description: "Stop level" })),
       stopDistance: Type.Optional(
-        Type.Number({ description: "Stop distance" })
+        Type.Number({ description: "Stop distance" }),
       ),
     }),
     async execute(_id, params) {
@@ -457,7 +415,7 @@ export function registerDealingTools(api: OpenClawPluginApi): void {
       const result = await client.request(
         "PUT",
         `/working-orders/otc/${dealId}`,
-        { version: "2", body }
+        { version: "2", body },
       );
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],

@@ -56,7 +56,7 @@ export function registerSentimentTools(api: OpenClawPluginApi): void {
       const result = await client.request(
         "GET",
         `/client-sentiment/${marketId}`,
-        { version: "1" }
+        { version: "1" },
       );
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
@@ -80,7 +80,7 @@ export function registerSentimentTools(api: OpenClawPluginApi): void {
       const result = await client.request(
         "GET",
         `/client-sentiment/related/${marketId}`,
-        { version: "1" }
+        { version: "1" },
       );
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],

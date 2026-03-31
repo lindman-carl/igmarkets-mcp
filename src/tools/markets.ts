@@ -34,7 +34,7 @@ const ResolutionType = Type.Union(
     Type.Literal("WEEK"),
     Type.Literal("MONTH"),
   ],
-  { description: "Price resolution" }
+  { description: "Price resolution" },
 );
 
 export function registerMarketsTools(api: OpenClawPluginApi): void {
@@ -74,7 +74,7 @@ export function registerMarketsTools(api: OpenClawPluginApi): void {
       const result = await client.request(
         "GET",
         `/categories/${categoryId}/instruments`,
-        { version: "1" }
+        { version: "1" },
       );
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
@@ -197,7 +197,7 @@ export function registerMarketsTools(api: OpenClawPluginApi): void {
       const result = await client.request(
         "GET",
         `/prices/${epic}/${resolution}/${numPoints}`,
-        { version: "2" }
+        { version: "2" },
       );
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
@@ -229,7 +229,7 @@ export function registerMarketsTools(api: OpenClawPluginApi): void {
       const result = await client.request(
         "GET",
         `/prices/${epic}/${resolution}/${startDate}/${endDate}`,
-        { version: "2" }
+        { version: "2" },
       );
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],

@@ -17,14 +17,13 @@ import { Type } from "@sinclair/typebox";
 import type { OpenClawPluginApi } from "../types/openclaw.js";
 import { getClient } from "../ig-client.js";
 
-const DirectionType = Type.Union(
-  [Type.Literal("BUY"), Type.Literal("SELL")],
-  { description: "Direction" }
-);
+const DirectionType = Type.Union([Type.Literal("BUY"), Type.Literal("SELL")], {
+  description: "Direction",
+});
 
 const OrderTypeType = Type.Union(
   [Type.Literal("MARKET"), Type.Literal("LIMIT"), Type.Literal("QUOTE")],
-  { description: "Order type" }
+  { description: "Order type" },
 );
 
 export function registerGeneralTools(api: OpenClawPluginApi): void {
@@ -42,19 +41,15 @@ export function registerGeneralTools(api: OpenClawPluginApi): void {
       size: Type.Number({ description: "Deal size" }),
       orderType: OrderTypeType,
       currencyCode: Type.String({ description: "Currency code" }),
-      expiry: Type.Optional(
-        Type.String({ description: "Instrument expiry" })
-      ),
-      level: Type.Optional(
-        Type.Number({ description: "Deal level" })
-      ),
+      expiry: Type.Optional(Type.String({ description: "Instrument expiry" })),
+      level: Type.Optional(Type.Number({ description: "Deal level" })),
     }),
     async execute(_id, params) {
       const client = getClient();
       const result = await client.request(
         "POST",
         "/indicativecostsandcharges/open",
-        { version: "1", body: params }
+        { version: "1", body: params },
       );
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
@@ -67,27 +62,22 @@ export function registerGeneralTools(api: OpenClawPluginApi): void {
   // ---------------------------------------------------------------------------
   api.registerTool({
     name: "ig_costs_close",
-    description:
-      "Returns indicative costs and charges for closing a position.",
+    description: "Returns indicative costs and charges for closing a position.",
     parameters: Type.Object({
       epic: Type.String({ description: "Instrument epic identifier" }),
       direction: DirectionType,
       size: Type.Number({ description: "Deal size" }),
       orderType: OrderTypeType,
       currencyCode: Type.String({ description: "Currency code" }),
-      expiry: Type.Optional(
-        Type.String({ description: "Instrument expiry" })
-      ),
-      level: Type.Optional(
-        Type.Number({ description: "Deal level" })
-      ),
+      expiry: Type.Optional(Type.String({ description: "Instrument expiry" })),
+      level: Type.Optional(Type.Number({ description: "Deal level" })),
     }),
     async execute(_id, params) {
       const client = getClient();
       const result = await client.request(
         "POST",
         "/indicativecostsandcharges/close",
-        { version: "1", body: params }
+        { version: "1", body: params },
       );
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
@@ -100,27 +90,22 @@ export function registerGeneralTools(api: OpenClawPluginApi): void {
   // ---------------------------------------------------------------------------
   api.registerTool({
     name: "ig_costs_edit",
-    description:
-      "Returns indicative costs and charges for editing an order.",
+    description: "Returns indicative costs and charges for editing an order.",
     parameters: Type.Object({
       epic: Type.String({ description: "Instrument epic identifier" }),
       direction: DirectionType,
       size: Type.Number({ description: "Deal size" }),
       orderType: OrderTypeType,
       currencyCode: Type.String({ description: "Currency code" }),
-      expiry: Type.Optional(
-        Type.String({ description: "Instrument expiry" })
-      ),
-      level: Type.Optional(
-        Type.Number({ description: "Deal level" })
-      ),
+      expiry: Type.Optional(Type.String({ description: "Instrument expiry" })),
+      level: Type.Optional(Type.Number({ description: "Deal level" })),
     }),
     async execute(_id, params) {
       const client = getClient();
       const result = await client.request(
         "POST",
         "/indicativecostsandcharges/edit",
-        { version: "1", body: params }
+        { version: "1", body: params },
       );
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
@@ -147,7 +132,7 @@ export function registerGeneralTools(api: OpenClawPluginApi): void {
       const result = await client.request(
         "GET",
         `/indicativecostsandcharges/durablemedium/${indicativeQuoteReference}`,
-        { version: "1" }
+        { version: "1" },
       );
       return {
         content: [
@@ -180,7 +165,7 @@ export function registerGeneralTools(api: OpenClawPluginApi): void {
       const result = await client.request(
         "GET",
         `/indicativecostsandcharges/history/from/${from}/to/${to}`,
-        { version: "1" }
+        { version: "1" },
       );
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
@@ -214,17 +199,15 @@ export function registerGeneralTools(api: OpenClawPluginApi): void {
     description: "Alters the details of a given user application.",
     parameters: Type.Object({
       allowanceAccountOverall: Type.Optional(
-        Type.Number({ description: "Overall account allowance" })
+        Type.Number({ description: "Overall account allowance" }),
       ),
       allowanceAccountTrading: Type.Optional(
-        Type.Number({ description: "Trading allowance" })
+        Type.Number({ description: "Trading allowance" }),
       ),
       allowanceAccountHistoricalData: Type.Optional(
-        Type.Number({ description: "Historical data allowance" })
+        Type.Number({ description: "Historical data allowance" }),
       ),
-      apiKey: Type.Optional(
-        Type.String({ description: "API key to update" })
-      ),
+      apiKey: Type.Optional(Type.String({ description: "API key to update" })),
       status: Type.Optional(
         Type.Union(
           [
@@ -232,8 +215,8 @@ export function registerGeneralTools(api: OpenClawPluginApi): void {
             Type.Literal("DISABLED"),
             Type.Literal("REVOKED"),
           ],
-          { description: "Application status" }
-        )
+          { description: "Application status" },
+        ),
       ),
     }),
     async execute(_id, params) {
@@ -262,7 +245,7 @@ export function registerGeneralTools(api: OpenClawPluginApi): void {
       const result = await client.request(
         "PUT",
         "/operations/application/disable",
-        { version: "1" }
+        { version: "1" },
       );
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],

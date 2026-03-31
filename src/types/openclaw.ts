@@ -59,11 +59,11 @@ export interface IGPluginConfig {
 /** OpenClaw Plugin API passed to register() */
 export interface OpenClawPluginApi {
   registerTool<T extends TProperties = TProperties>(
-    tool: ToolRegistration<T>
+    tool: ToolRegistration<T>,
   ): void;
   on(
     event: "before_tool_call",
-    handler: (event: BeforeToolCallEvent) => HookDecision
+    handler: (event: BeforeToolCallEvent) => HookDecision,
   ): void;
   pluginConfig: IGPluginConfig;
   logger: PluginLogger;

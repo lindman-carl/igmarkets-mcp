@@ -42,8 +42,7 @@ export function registerAccountTools(api: OpenClawPluginApi): void {
   // ---------------------------------------------------------------------------
   api.registerTool({
     name: "ig_preferences",
-    description:
-      "Returns account preferences such as trailing stops enabled.",
+    description: "Returns account preferences such as trailing stops enabled.",
     parameters: Type.Object({}),
     async execute(_id, _params) {
       const client = getClient();
@@ -65,7 +64,7 @@ export function registerAccountTools(api: OpenClawPluginApi): void {
       "Updates account preferences. Pass the preference fields you wish to change.",
     parameters: Type.Object({
       trailingStopsEnabled: Type.Optional(
-        Type.Boolean({ description: "Enable/disable trailing stops" })
+        Type.Boolean({ description: "Enable/disable trailing stops" }),
       ),
     }),
     async execute(_id, params) {
@@ -90,25 +89,23 @@ export function registerAccountTools(api: OpenClawPluginApi): void {
       "FIQL filter, and page size. Uses API v3.",
     parameters: Type.Object({
       from: Type.Optional(
-        Type.String({ description: "Start date (yyyy-MM-ddTHH:mm:ss)" })
+        Type.String({ description: "Start date (yyyy-MM-ddTHH:mm:ss)" }),
       ),
       to: Type.Optional(
-        Type.String({ description: "End date (yyyy-MM-ddTHH:mm:ss)" })
+        Type.String({ description: "End date (yyyy-MM-ddTHH:mm:ss)" }),
       ),
       detailed: Type.Optional(
-        Type.Boolean({ description: "Include detailed activity info" })
+        Type.Boolean({ description: "Include detailed activity info" }),
       ),
-      dealId: Type.Optional(
-        Type.String({ description: "Filter by deal ID" })
-      ),
+      dealId: Type.Optional(Type.String({ description: "Filter by deal ID" })),
       filter: Type.Optional(
-        Type.String({ description: "FIQL filter expression" })
+        Type.String({ description: "FIQL filter expression" }),
       ),
       pageSize: Type.Optional(
-        Type.Number({ description: "Page size (default 50, max 500)" })
+        Type.Number({ description: "Page size (default 50, max 500)" }),
       ),
       pageNumber: Type.Optional(
-        Type.Number({ description: "Page number (1-based)" })
+        Type.Number({ description: "Page number (1-based)" }),
       ),
     }),
     async execute(_id, params) {
@@ -121,13 +118,11 @@ export function registerAccountTools(api: OpenClawPluginApi): void {
       if (params.dealId) queryParams.dealId = params.dealId;
       if (params.filter) queryParams.filter = params.filter;
       if (params.pageSize) queryParams.pageSize = String(params.pageSize);
-      if (params.pageNumber)
-        queryParams.pageNumber = String(params.pageNumber);
+      if (params.pageNumber) queryParams.pageNumber = String(params.pageNumber);
 
       const result = await client.request("GET", "/history/activity", {
         version: "3",
-        params:
-          Object.keys(queryParams).length > 0 ? queryParams : undefined,
+        params: Object.keys(queryParams).length > 0 ? queryParams : undefined,
       });
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
@@ -153,7 +148,7 @@ export function registerAccountTools(api: OpenClawPluginApi): void {
       const result = await client.request(
         "GET",
         `/history/activity/${fromDate}/${toDate}`,
-        { version: "1" }
+        { version: "1" },
       );
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
@@ -177,7 +172,7 @@ export function registerAccountTools(api: OpenClawPluginApi): void {
       const result = await client.request(
         "GET",
         `/history/activity/${lastPeriod}`,
-        { version: "1" }
+        { version: "1" },
       );
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
@@ -201,24 +196,20 @@ export function registerAccountTools(api: OpenClawPluginApi): void {
             Type.Literal("DEPOSIT"),
             Type.Literal("WITHDRAWAL"),
           ],
-          { description: "Transaction type filter" }
-        )
+          { description: "Transaction type filter" },
+        ),
       ),
       from: Type.Optional(
-        Type.String({ description: "Start date (yyyy-MM-ddTHH:mm:ss)" })
+        Type.String({ description: "Start date (yyyy-MM-ddTHH:mm:ss)" }),
       ),
       to: Type.Optional(
-        Type.String({ description: "End date (yyyy-MM-ddTHH:mm:ss)" })
+        Type.String({ description: "End date (yyyy-MM-ddTHH:mm:ss)" }),
       ),
       maxSpanSeconds: Type.Optional(
-        Type.Number({ description: "Max span in seconds" })
+        Type.Number({ description: "Max span in seconds" }),
       ),
-      pageSize: Type.Optional(
-        Type.Number({ description: "Page size" })
-      ),
-      pageNumber: Type.Optional(
-        Type.Number({ description: "Page number" })
-      ),
+      pageSize: Type.Optional(Type.Number({ description: "Page size" })),
+      pageNumber: Type.Optional(Type.Number({ description: "Page number" })),
     }),
     async execute(_id, params) {
       const client = getClient();
@@ -229,13 +220,11 @@ export function registerAccountTools(api: OpenClawPluginApi): void {
       if (params.maxSpanSeconds)
         queryParams.maxSpanSeconds = String(params.maxSpanSeconds);
       if (params.pageSize) queryParams.pageSize = String(params.pageSize);
-      if (params.pageNumber)
-        queryParams.pageNumber = String(params.pageNumber);
+      if (params.pageNumber) queryParams.pageNumber = String(params.pageNumber);
 
       const result = await client.request("GET", "/history/transactions", {
         version: "2",
-        params:
-          Object.keys(queryParams).length > 0 ? queryParams : undefined,
+        params: Object.keys(queryParams).length > 0 ? queryParams : undefined,
       });
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
@@ -259,7 +248,7 @@ export function registerAccountTools(api: OpenClawPluginApi): void {
           Type.Literal("DEPOSIT"),
           Type.Literal("WITHDRAWAL"),
         ],
-        { description: "Transaction type" }
+        { description: "Transaction type" },
       ),
       fromDate: Type.String({ description: "Start date (dd-MM-yyyy)" }),
       toDate: Type.String({ description: "End date (dd-MM-yyyy)" }),
@@ -270,7 +259,7 @@ export function registerAccountTools(api: OpenClawPluginApi): void {
       const result = await client.request(
         "GET",
         `/history/transactions/${transactionType}/${fromDate}/${toDate}`,
-        { version: "1" }
+        { version: "1" },
       );
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
@@ -293,7 +282,7 @@ export function registerAccountTools(api: OpenClawPluginApi): void {
           Type.Literal("DEPOSIT"),
           Type.Literal("WITHDRAWAL"),
         ],
-        { description: "Transaction type" }
+        { description: "Transaction type" },
       ),
       lastPeriod: Type.String({ description: "Period in milliseconds" }),
     }),
@@ -303,7 +292,7 @@ export function registerAccountTools(api: OpenClawPluginApi): void {
       const result = await client.request(
         "GET",
         `/history/transactions/${transactionType}/${lastPeriod}`,
-        { version: "1" }
+        { version: "1" },
       );
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],

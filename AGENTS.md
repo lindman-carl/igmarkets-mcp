@@ -30,12 +30,12 @@ Configure the plugin in your `openclaw.json`:
           apiKey: "your-ig-api-key",
           username: "your-ig-username",
           password: "your-ig-password",
-          isDemo: true,           // default: true (safety)
-          tradeApproval: true     // default: true (prompts before trades)
-        }
-      }
-    }
-  }
+          isDemo: true, // default: true (safety)
+          tradeApproval: true, // default: true (prompts before trades)
+        },
+      },
+    },
+  },
 }
 ```
 
@@ -142,91 +142,91 @@ If the session expires, call `ig_refresh_token` (v3) or re-login.
 
 ### Session (8)
 
-| Tool | Description |
-| ------ | ------------- |
-| `ig_login` | Login with OAuth v3 (recommended) |
-| `ig_login_v2` | Login with CST/security tokens (v2) |
-| `ig_logout` | End current session |
+| Tool                 | Description                                  |
+| -------------------- | -------------------------------------------- |
+| `ig_login`           | Login with OAuth v3 (recommended)            |
+| `ig_login_v2`        | Login with CST/security tokens (v2)          |
+| `ig_logout`          | End current session                          |
 | `ig_session_details` | Get session info (account, client, timezone) |
-| `ig_switch_account` | Switch active account |
-| `ig_refresh_token` | Refresh OAuth access token |
-| `ig_encryption_key` | Get password encryption key |
-| `ig_session_status` | Check auth status (local, no API call) |
+| `ig_switch_account`  | Switch active account                        |
+| `ig_refresh_token`   | Refresh OAuth access token                   |
+| `ig_encryption_key`  | Get password encryption key                  |
+| `ig_session_status`  | Check auth status (local, no API call)       |
 
 ### Accounts (9)
 
-| Tool | Description |
-| ------ | ------------- |
-| `ig_accounts` | List all accounts |
-| `ig_preferences` | Get account preferences |
-| `ig_update_preferences` | Update account preferences |
-| `ig_activity_history` | Activity history (v3, paged) |
-| `ig_activity_history_range` | Activity by date range (v1) |
-| `ig_activity_history_period` | Activity by period (v1) |
-| `ig_transaction_history` | Transactions (v2, paged) |
-| `ig_transaction_history_range` | Transactions by date range (v1) |
-| `ig_transaction_history_period` | Transactions by period (v1) |
+| Tool                            | Description                     |
+| ------------------------------- | ------------------------------- |
+| `ig_accounts`                   | List all accounts               |
+| `ig_preferences`                | Get account preferences         |
+| `ig_update_preferences`         | Update account preferences      |
+| `ig_activity_history`           | Activity history (v3, paged)    |
+| `ig_activity_history_range`     | Activity by date range (v1)     |
+| `ig_activity_history_period`    | Activity by period (v1)         |
+| `ig_transaction_history`        | Transactions (v2, paged)        |
+| `ig_transaction_history_range`  | Transactions by date range (v1) |
+| `ig_transaction_history_period` | Transactions by period (v1)     |
 
 ### Dealing (10)
 
-| Tool | Description |
-| ------ | ------------- |
-| `ig_deal_confirmation` | Check outcome of a trade operation |
-| `ig_positions` | List all open positions |
-| `ig_position` | Get single position by dealId |
-| `ig_create_position` | Open a new position |
-| `ig_close_position` | Close a position |
-| `ig_update_position` | Update stops/limits on a position |
-| `ig_working_orders` | List all working orders |
-| `ig_create_working_order` | Create a limit/stop order |
-| `ig_delete_working_order` | Cancel a working order |
-| `ig_update_working_order` | Modify a working order |
+| Tool                      | Description                        |
+| ------------------------- | ---------------------------------- |
+| `ig_deal_confirmation`    | Check outcome of a trade operation |
+| `ig_positions`            | List all open positions            |
+| `ig_position`             | Get single position by dealId      |
+| `ig_create_position`      | Open a new position                |
+| `ig_close_position`       | Close a position                   |
+| `ig_update_position`      | Update stops/limits on a position  |
+| `ig_working_orders`       | List all working orders            |
+| `ig_create_working_order` | Create a limit/stop order          |
+| `ig_delete_working_order` | Cancel a working order             |
+| `ig_update_working_order` | Modify a working order             |
 
 ### Markets (8)
 
-| Tool | Description |
-| ------ | ------------- |
-| `ig_categories` | List market categories (top-level navigation) |
-| `ig_category_instruments` | List instruments in a category |
-| `ig_markets` | Get details for multiple markets (by epic list) |
-| `ig_market` | Get full details for a single market |
-| `ig_search_markets` | Search markets by keyword |
-| `ig_prices` | Price snapshot (default range) |
-| `ig_prices_points` | Last N price data points |
-| `ig_prices_range` | Prices between two dates |
+| Tool                      | Description                                     |
+| ------------------------- | ----------------------------------------------- |
+| `ig_categories`           | List market categories (top-level navigation)   |
+| `ig_category_instruments` | List instruments in a category                  |
+| `ig_markets`              | Get details for multiple markets (by epic list) |
+| `ig_market`               | Get full details for a single market            |
+| `ig_search_markets`       | Search markets by keyword                       |
+| `ig_prices`               | Price snapshot (default range)                  |
+| `ig_prices_points`        | Last N price data points                        |
+| `ig_prices_range`         | Prices between two dates                        |
 
 ### Watchlists (6)
 
-| Tool | Description |
-| ------ | ------------- |
-| `ig_watchlists` | List all watchlists |
-| `ig_create_watchlist` | Create a new watchlist |
-| `ig_watchlist` | Get instruments in a watchlist |
-| `ig_delete_watchlist` | Delete a watchlist |
-| `ig_watchlist_add_market` | Add a market to a watchlist |
+| Tool                         | Description                      |
+| ---------------------------- | -------------------------------- |
+| `ig_watchlists`              | List all watchlists              |
+| `ig_create_watchlist`        | Create a new watchlist           |
+| `ig_watchlist`               | Get instruments in a watchlist   |
+| `ig_delete_watchlist`        | Delete a watchlist               |
+| `ig_watchlist_add_market`    | Add a market to a watchlist      |
 | `ig_watchlist_remove_market` | Remove a market from a watchlist |
 
 ### Sentiment (3)
 
-| Tool | Description |
-| ------ | ------------- |
+| Tool                       | Description                    |
+| -------------------------- | ------------------------------ |
 | `ig_client_sentiment_bulk` | Sentiment for multiple markets |
-| `ig_client_sentiment` | Sentiment for a single market |
-| `ig_related_sentiment` | Sentiment for related markets |
+| `ig_client_sentiment`      | Sentiment for a single market  |
+| `ig_related_sentiment`     | Sentiment for related markets  |
 
 ### General (9)
 
-| Tool | Description |
-| ------ | ------------- |
-| `ig_costs_open` | Get costs/charges for opening a position |
-| `ig_costs_close` | Get costs/charges for closing a position |
-| `ig_costs_edit` | Get costs/charges for editing a position |
-| `ig_costs_pdf` | Download costs PDF document |
-| `ig_costs_history` | Historical costs and charges |
-| `ig_applications` | List API applications |
-| `ig_update_application` | Update an API application |
-| `ig_disable_application` | Disable an API application |
-| `ig_repeat_deal_window` | Get repeat deal window info |
+| Tool                     | Description                              |
+| ------------------------ | ---------------------------------------- |
+| `ig_costs_open`          | Get costs/charges for opening a position |
+| `ig_costs_close`         | Get costs/charges for closing a position |
+| `ig_costs_edit`          | Get costs/charges for editing a position |
+| `ig_costs_pdf`           | Download costs PDF document              |
+| `ig_costs_history`       | Historical costs and charges             |
+| `ig_applications`        | List API applications                    |
+| `ig_update_application`  | Update an API application                |
+| `ig_disable_application` | Disable an API application               |
+| `ig_repeat_deal_window`  | Get repeat deal window info              |
 
 ## Key IG Concepts
 

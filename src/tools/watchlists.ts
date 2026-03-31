@@ -44,7 +44,7 @@ export function registerWatchlistTools(api: OpenClawPluginApi): void {
       epics: Type.Optional(
         Type.Array(Type.String(), {
           description: "List of instrument epics to add initially",
-        })
+        }),
       ),
     }),
     async execute(_id, params) {
@@ -72,11 +72,9 @@ export function registerWatchlistTools(api: OpenClawPluginApi): void {
     async execute(_id, params) {
       const { watchlistId } = params;
       const client = getClient();
-      const result = await client.request(
-        "GET",
-        `/watchlists/${watchlistId}`,
-        { version: "1" }
-      );
+      const result = await client.request("GET", `/watchlists/${watchlistId}`, {
+        version: "1",
+      });
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       };
@@ -98,7 +96,7 @@ export function registerWatchlistTools(api: OpenClawPluginApi): void {
       const result = await client.request(
         "DELETE",
         `/watchlists/${watchlistId}`,
-        { version: "1" }
+        { version: "1" },
       );
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
@@ -119,11 +117,10 @@ export function registerWatchlistTools(api: OpenClawPluginApi): void {
     async execute(_id, params) {
       const { watchlistId, epic } = params;
       const client = getClient();
-      const result = await client.request(
-        "PUT",
-        `/watchlists/${watchlistId}`,
-        { version: "1", body: { epic } }
-      );
+      const result = await client.request("PUT", `/watchlists/${watchlistId}`, {
+        version: "1",
+        body: { epic },
+      });
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       };
@@ -146,7 +143,7 @@ export function registerWatchlistTools(api: OpenClawPluginApi): void {
       const result = await client.request(
         "DELETE",
         `/watchlists/${watchlistId}/${epic}`,
-        { version: "1" }
+        { version: "1" },
       );
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],

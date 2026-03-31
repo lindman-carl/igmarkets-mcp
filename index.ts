@@ -10,7 +10,10 @@
  *   }
  */
 
-import type { PluginEntryDefinition, OpenClawPluginApi } from "./src/types/openclaw.js";
+import type {
+  PluginEntryDefinition,
+  OpenClawPluginApi,
+} from "./src/types/openclaw.js";
 import { registerSessionTools } from "./src/tools/session.js";
 import { registerAccountTools } from "./src/tools/accounts.js";
 import { registerDealingTools } from "./src/tools/dealing.js";
@@ -36,7 +39,9 @@ const TRADE_TOOLS = new Set([
  * For build compatibility without the SDK installed, we export the
  * definition object directly. The OpenClaw gateway accepts both forms.
  */
-function definePluginEntry(entry: PluginEntryDefinition): PluginEntryDefinition {
+function definePluginEntry(
+  entry: PluginEntryDefinition,
+): PluginEntryDefinition {
   return entry;
 }
 
@@ -82,20 +87,18 @@ export default definePluginEntry({
         .login()
         .then(() => {
           api.logger.info(
-            `Auto-logged in as ${config.username} (${isDemo ? "demo" : "live"})`
+            `Auto-logged in as ${config.username} (${isDemo ? "demo" : "live"})`,
           );
         })
         .catch((err: unknown) => {
           api.logger.warn(
-            `Auto-login failed: ${err instanceof Error ? err.message : err}`
+            `Auto-login failed: ${err instanceof Error ? err.message : err}`,
           );
-          api.logger.info(
-            "Use the ig_login tool to authenticate manually."
-          );
+          api.logger.info("Use the ig_login tool to authenticate manually.");
         });
     } else {
       api.logger.info(
-        "No credentials configured. Use ig_login tool or set apiKey/username/password in plugin config."
+        "No credentials configured. Use ig_login tool or set apiKey/username/password in plugin config.",
       );
     }
   },

@@ -12,7 +12,12 @@
 
 import { Type } from "@sinclair/typebox";
 import type { OpenClawPluginApi } from "../types/openclaw.js";
-import { getClient, initClient, hasClient, type IGClientConfig } from "../ig-client.js";
+import {
+  getClient,
+  initClient,
+  hasClient,
+  type IGClientConfig,
+} from "../ig-client.js";
 
 export function registerSessionTools(api: OpenClawPluginApi): void {
   // ---------------------------------------------------------------------------
@@ -32,7 +37,7 @@ export function registerSessionTools(api: OpenClawPluginApi): void {
         Type.Boolean({
           default: true,
           description: "Use demo environment (default: true for safety)",
-        })
+        }),
       ),
     }),
     async execute(_id, params) {
@@ -59,13 +64,13 @@ export function registerSessionTools(api: OpenClawPluginApi): void {
       username: Type.String({ description: "IG username/identifier" }),
       password: Type.String({ description: "IG password" }),
       isDemo: Type.Optional(
-        Type.Boolean({ default: true, description: "Use demo environment" })
+        Type.Boolean({ default: true, description: "Use demo environment" }),
       ),
       encryptedPassword: Type.Optional(
         Type.Boolean({
           default: false,
           description: "Whether the password is encrypted",
-        })
+        }),
       ),
     }),
     async execute(_id, params) {
@@ -114,7 +119,7 @@ export function registerSessionTools(api: OpenClawPluginApi): void {
         Type.Boolean({
           default: false,
           description: "Whether to fetch session token headers",
-        })
+        }),
       ),
     }),
     async execute(_id, params) {
@@ -126,8 +131,7 @@ export function registerSessionTools(api: OpenClawPluginApi): void {
       }
       const result = await client.request("GET", "/session", {
         version: "1",
-        params:
-          Object.keys(queryParams).length > 0 ? queryParams : undefined,
+        params: Object.keys(queryParams).length > 0 ? queryParams : undefined,
       });
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
@@ -145,7 +149,7 @@ export function registerSessionTools(api: OpenClawPluginApi): void {
     parameters: Type.Object({
       accountId: Type.String({ description: "The account ID to switch to" }),
       defaultAccount: Type.Optional(
-        Type.Boolean({ description: "Set as default account" })
+        Type.Boolean({ description: "Set as default account" }),
       ),
     }),
     async execute(_id, params) {
@@ -223,7 +227,7 @@ export function registerSessionTools(api: OpenClawPluginApi): void {
                 clientId: info?.clientId ?? null,
               },
               null,
-              2
+              2,
             ),
           },
         ],

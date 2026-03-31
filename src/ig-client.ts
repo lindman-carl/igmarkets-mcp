@@ -187,7 +187,7 @@ export class IGClient {
       version?: string;
       body?: unknown;
       params?: Record<string, string>;
-    } = {}
+    } = {},
   ): Promise<any> {
     const { version = "1", body, params } = options;
 
@@ -241,7 +241,9 @@ export class IGClient {
 
     if (!res.ok) {
       const errorBody = await res.text();
-      throw new Error(`IG API error ${res.status} ${method} ${path}: ${errorBody}`);
+      throw new Error(
+        `IG API error ${res.status} ${method} ${path}: ${errorBody}`,
+      );
     }
 
     const contentType = res.headers.get("content-type") ?? "";
@@ -278,7 +280,7 @@ export function getClient(): IGClient {
   if (!client) {
     throw new Error(
       "IG client not initialized. Use the ig_login tool first, or set " +
-        "IG_API_KEY, IG_USERNAME, IG_PASSWORD environment variables."
+        "IG_API_KEY, IG_USERNAME, IG_PASSWORD environment variables.",
     );
   }
   return client;
