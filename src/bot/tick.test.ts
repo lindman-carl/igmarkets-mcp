@@ -32,6 +32,31 @@ import type { IGClient } from "../ig-client.js";
 function createTestDb(): BotDatabase {
   const sqlite = new Database(":memory:");
   sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS strategies (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+      name           TEXT NOT NULL UNIQUE,
+      prompt         TEXT NOT NULL,
+      strategy_type  TEXT NOT NULL,
+      strategy_params TEXT,
+      risk_config    TEXT,
+      is_active      INTEGER DEFAULT true NOT NULL,
+      created_at     TEXT NOT NULL,
+      updated_at     TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS accounts (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+      name             TEXT NOT NULL UNIQUE,
+      ig_api_key       TEXT NOT NULL,
+      ig_username      TEXT NOT NULL,
+      ig_password      TEXT NOT NULL,
+      is_demo          INTEGER DEFAULT true NOT NULL,
+      strategy_id      INTEGER NOT NULL,
+      interval_minutes INTEGER DEFAULT 15 NOT NULL,
+      timezone         TEXT DEFAULT 'Europe/London' NOT NULL,
+      is_active        INTEGER DEFAULT true NOT NULL,
+      created_at       TEXT NOT NULL,
+      updated_at       TEXT NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS bot_state (
       key   TEXT PRIMARY KEY NOT NULL,
       value TEXT NOT NULL,
@@ -39,6 +64,7 @@ function createTestDb(): BotDatabase {
     );
     CREATE TABLE IF NOT EXISTS positions (
       id            INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+      account_id    INTEGER,
       deal_id       TEXT NOT NULL UNIQUE,
       epic          TEXT NOT NULL,
       direction     TEXT NOT NULL,
@@ -60,6 +86,7 @@ function createTestDb(): BotDatabase {
     );
     CREATE TABLE IF NOT EXISTS signals (
       id              INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+      account_id      INTEGER,
       tick_id         INTEGER NOT NULL,
       epic            TEXT NOT NULL,
       strategy        TEXT NOT NULL,
@@ -77,6 +104,7 @@ function createTestDb(): BotDatabase {
     );
     CREATE TABLE IF NOT EXISTS ticks (
       id                  INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+      account_id          INTEGER,
       started_at          TEXT NOT NULL,
       completed_at        TEXT,
       status              TEXT DEFAULT 'running' NOT NULL,
@@ -88,6 +116,7 @@ function createTestDb(): BotDatabase {
     );
     CREATE TABLE IF NOT EXISTS trades (
       id               INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+      account_id       INTEGER,
       tick_id          INTEGER NOT NULL,
       signal_id        INTEGER,
       deal_reference   TEXT,

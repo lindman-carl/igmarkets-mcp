@@ -292,9 +292,74 @@ full documentation.
 | `src/bot/executor.ts`        | Trade execution + confirmation      |
 | `src/bot/circuit-breaker.ts` | Safety circuit breaker              |
 | `src/bot/state.ts`           | SQLite persistence CRUD             |
+| `src/bot/prompt-parser.ts`   | Strategy prompt parser (YAML + MD)  |
 | `src/bot/logger.ts`          | Structured trade journal            |
 | `src/lib/indicators.ts`      | Technical indicators (SMA, ATR, BB) |
 | `src/db/schema.ts`           | Drizzle ORM table definitions       |
+
+### Database Schema (7 tables)
+
+| Table        | Purpose                                              |
+| ------------ | ---------------------------------------------------- |
+| `strategies` | Named strategy configs with markdown prompt + params |
+| `accounts`   | IG trading accounts, each linked to a strategy       |
+| `ticks`      | One row per bot execution cycle                      |
+| `signals`    | Strategy signals generated during ticks              |
+| `trades`     | Executed trade operations and outcomes               |
+| `positions`  | Tracked open positions and their lifecycle           |
+| `bot_state`  | Key-value store for misc state (circuit breaker)     |
+
+The `ticks`, `signals`, `trades`, and `positions` tables have a nullable
+`account_id` column for multi-account scoping. `NULL` means legacy
+single-account mode.
+
+### Multi-Account / Strategy Layer
+
+Each **strategy** has:
+- A unique `name`
+- A markdown `prompt` with YAML frontmatter (tickers, risk params, strategy type)
+- A `strategyType` (e.g. "trend-following", "breakout", or custom)
+- Optional JSON `strategyParams` and `riskConfig` overrides
+- An `isActive` flag
+
+Each **account** has:
+- A unique `name` (e.g. "UK Indices Demo")
+- IG credentials (`igApiKey`, `igUsername`, `igPassword`, `isDemo`)
+- A `strategyId` FK linking to a strategy
+- Tick interval and timezone config
+- An `isActive` flag
+
+Strategy prompts use **YAML frontmatter + markdown body** format:
+
+```markdown
+---
+name: "FTSE Trend Follower"
+tickers:
+  - epic: "IX.D.FTSE.DAILY.IP"
+    expiry: "DFB"
+    currencyCode: "GBP"
+strategyType: "trend-following"
+riskPerTrade: 0.01
+maxOpenPositions: 3
+---
+
+## Trading Rules
+
+Buy when SMA10 crosses above SMA20.
+```
+
+Parse with `parseStrategyPrompt(prompt)` from `src/bot/prompt-parser.ts`.
+
+### State Layer Functions (state.ts)
+
+Strategy CRUD: `insertStrategy`, `getStrategy`, `getStrategyByName`,
+`getActiveStrategies`, `updateStrategy`, `deleteStrategy`
+
+Account CRUD: `insertAccount`, `getAccount`, `getAccountByName`,
+`getActiveAccounts`, `updateAccount`, `deleteAccount`
+
+Circuit breaker and position queries accept optional `accountId` for
+per-account scoping.
 
 ### Key Conventions for Bot Code
 

@@ -301,6 +301,100 @@ export const CircuitBreakerConfigSchema = z.object({
 });
 export type CircuitBreakerConfig = z.infer<typeof CircuitBreakerConfigSchema>;
 
+// ---------------------------------------------------------------------------
+// Strategy Prompt Frontmatter (parsed from YAML header in prompt markdown)
+// ---------------------------------------------------------------------------
+
+export const StrategyPromptFrontmatterSchema = z.object({
+  /** Display name (optional, strategy.name is canonical) */
+  name: z.optional(z.string()),
+  /** Tickers to trade — overrides watchlist when present */
+  tickers: z.optional(z.array(WatchlistItemSchema)),
+  /** Base strategy type */
+  strategyType: z.optional(z.string()),
+  /** Risk per trade override (fraction, e.g. 0.01 = 1%) */
+  riskPerTrade: z.optional(z.number().positive().max(0.1)),
+  /** Max open positions override */
+  maxOpenPositions: z.optional(z.number().int().positive()),
+  /** Strategy parameter overrides */
+  strategyParams: z.optional(StrategyParamsSchema),
+});
+export type StrategyPromptFrontmatter = z.infer<
+  typeof StrategyPromptFrontmatterSchema
+>;
+
+/** Result of parsing a strategy prompt's markdown content. */
+export interface ParsedStrategyPrompt {
+  /** Parsed and validated frontmatter metadata */
+  frontmatter: StrategyPromptFrontmatter;
+  /** The markdown body (everything after the frontmatter) */
+  body: string;
+}
+
+// ---------------------------------------------------------------------------
+// Strategy (persisted in strategies table)
+// ---------------------------------------------------------------------------
+
+export const StrategySchema = z.object({
+  id: z.optional(z.number()),
+  name: z.string().min(1),
+  prompt: z.string(),
+  strategyType: z.string(),
+  strategyParams: z.optional(z.nullable(z.unknown())),
+  riskConfig: z.optional(z.nullable(z.unknown())),
+  isActive: z.optional(z.boolean()),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type Strategy = z.infer<typeof StrategySchema>;
+
+export const InsertStrategySchema = z.object({
+  name: z.string().min(1),
+  prompt: z.string(),
+  strategyType: z.string(),
+  strategyParams: z.optional(z.unknown()),
+  riskConfig: z.optional(z.unknown()),
+  isActive: z.optional(z.boolean()),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type InsertStrategy = z.infer<typeof InsertStrategySchema>;
+
+// ---------------------------------------------------------------------------
+// Account (persisted in accounts table)
+// ---------------------------------------------------------------------------
+
+export const AccountSchema = z.object({
+  id: z.optional(z.number()),
+  name: z.string().min(1),
+  igApiKey: z.string(),
+  igUsername: z.string(),
+  igPassword: z.string(),
+  isDemo: z.optional(z.boolean()),
+  strategyId: z.number(),
+  intervalMinutes: z.optional(z.number().int()),
+  timezone: z.optional(z.string()),
+  isActive: z.optional(z.boolean()),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type Account = z.infer<typeof AccountSchema>;
+
+export const InsertAccountSchema = z.object({
+  name: z.string().min(1),
+  igApiKey: z.string(),
+  igUsername: z.string(),
+  igPassword: z.string(),
+  isDemo: z.optional(z.boolean()),
+  strategyId: z.number(),
+  intervalMinutes: z.optional(z.number().int()),
+  timezone: z.optional(z.string()),
+  isActive: z.optional(z.boolean()),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type InsertAccount = z.infer<typeof InsertAccountSchema>;
+
 export const BotConfigSchema = z.object({
   /** Tick interval in minutes */
   intervalMinutes: z.union([
@@ -332,6 +426,9 @@ export const BotConfigSchema = z.object({
 
   /** Path to SQLite database file */
   dbPath: z.string().default("bot.db"),
+
+  /** Optional account ID (for multi-account mode) */
+  accountId: z.optional(z.number()),
 });
 export type BotConfig = z.infer<typeof BotConfigSchema>;
 

@@ -11,18 +11,30 @@
 
 import { eq, desc, and, sql } from "drizzle-orm";
 import type { BotDatabase } from "../db/connection.js";
-import { ticks, signals, trades, positions, botState } from "../db/schema.js";
+import {
+  ticks,
+  signals,
+  trades,
+  positions,
+  botState,
+  strategies,
+  accounts,
+} from "../db/schema.js";
 import {
   InsertTickSchema,
   InsertSignalSchema,
   InsertTradeSchema,
   InsertPositionSchema,
+  InsertStrategySchema,
+  InsertAccountSchema,
   CircuitBreakerStateSchema,
   DEFAULT_CIRCUIT_BREAKER_STATE,
   type InsertTick,
   type InsertSignal,
   type InsertTrade,
   type InsertPosition,
+  type InsertStrategy,
+  type InsertAccount,
   type CircuitBreakerState,
   type TickStatus,
   type TradeStatus,
@@ -36,9 +48,18 @@ type TickRow = typeof ticks.$inferSelect;
 type SignalRow = typeof signals.$inferSelect;
 type TradeRow = typeof trades.$inferSelect;
 type PositionRow = typeof positions.$inferSelect;
+type StrategyRow = typeof strategies.$inferSelect;
+type AccountRow = typeof accounts.$inferSelect;
 
 // Re-export row types for consumers
-export type { TickRow, SignalRow, TradeRow, PositionRow };
+export type {
+  TickRow,
+  SignalRow,
+  TradeRow,
+  PositionRow,
+  StrategyRow,
+  AccountRow,
+};
 
 // ---------------------------------------------------------------------------
 // Tick Operations
@@ -289,10 +310,24 @@ export async function insertPosition(
 
 /**
  * Get all open positions tracked by the bot.
+ * @param accountId - Optional account ID to filter positions
  */
 export async function getOpenPositions(
   db: BotDatabase,
+  accountId?: number,
 ): Promise<PositionRow[]> {
+  if (accountId != null) {
+    return db
+      .select()
+      .from(positions)
+      .where(
+        and(
+          eq(positions.status, "open"),
+          eq(positions.accountId, accountId),
+        ),
+      )
+      .orderBy(desc(positions.id));
+  }
   return db
     .select()
     .from(positions)
@@ -443,12 +478,23 @@ export async function deleteState(db: BotDatabase, key: string): Promise<void> {
 const CIRCUIT_BREAKER_KEY = "circuit_breaker";
 
 /**
+ * Build a circuit breaker key scoped to an account (or global).
+ */
+function cbKey(accountId?: number): string {
+  return accountId != null
+    ? `${CIRCUIT_BREAKER_KEY}:account:${accountId}`
+    : CIRCUIT_BREAKER_KEY;
+}
+
+/**
  * Get the current circuit breaker state.
+ * @param accountId - Optional account ID for per-account scoping
  */
 export async function getCircuitBreakerState(
   db: BotDatabase,
+  accountId?: number,
 ): Promise<CircuitBreakerState> {
-  const raw = await getState(db, CIRCUIT_BREAKER_KEY);
+  const raw = await getState(db, cbKey(accountId));
   if (!raw) return { ...DEFAULT_CIRCUIT_BREAKER_STATE };
 
   const result = CircuitBreakerStateSchema.safeParse(raw);
@@ -458,13 +504,210 @@ export async function getCircuitBreakerState(
 
 /**
  * Update the circuit breaker state.
+ * @param accountId - Optional account ID for per-account scoping
  */
 export async function setCircuitBreakerState(
   db: BotDatabase,
   state: CircuitBreakerState,
+  accountId?: number,
 ): Promise<void> {
   const validated = CircuitBreakerStateSchema.parse(state);
-  await setState(db, CIRCUIT_BREAKER_KEY, validated);
+  await setState(db, cbKey(accountId), validated);
+}
+
+// ---------------------------------------------------------------------------
+// Strategy Operations
+// ---------------------------------------------------------------------------
+
+/**
+ * Insert a new strategy and return its ID.
+ */
+export async function insertStrategy(
+  db: BotDatabase,
+  data: InsertStrategy,
+): Promise<number> {
+  const validated = InsertStrategySchema.parse(data);
+  const result = await db
+    .insert(strategies)
+    .values(validated)
+    .returning({ id: strategies.id });
+  return result[0].id;
+}
+
+/**
+ * Get a strategy by ID.
+ */
+export async function getStrategy(
+  db: BotDatabase,
+  id: number,
+): Promise<StrategyRow | null> {
+  const rows = await db
+    .select()
+    .from(strategies)
+    .where(eq(strategies.id, id))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/**
+ * Get a strategy by its unique name.
+ */
+export async function getStrategyByName(
+  db: BotDatabase,
+  name: string,
+): Promise<StrategyRow | null> {
+  const rows = await db
+    .select()
+    .from(strategies)
+    .where(eq(strategies.name, name))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/**
+ * Get all active strategies.
+ */
+export async function getActiveStrategies(
+  db: BotDatabase,
+): Promise<StrategyRow[]> {
+  return db
+    .select()
+    .from(strategies)
+    .where(eq(strategies.isActive, true))
+    .orderBy(desc(strategies.id));
+}
+
+/**
+ * Update a strategy's fields.
+ */
+export async function updateStrategy(
+  db: BotDatabase,
+  id: number,
+  data: Partial<{
+    name: string;
+    prompt: string;
+    strategyType: string;
+    strategyParams: unknown;
+    riskConfig: unknown;
+    isActive: boolean;
+  }>,
+): Promise<void> {
+  await db
+    .update(strategies)
+    .set({
+      ...data,
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(strategies.id, id));
+}
+
+/**
+ * Delete a strategy by ID.
+ */
+export async function deleteStrategy(
+  db: BotDatabase,
+  id: number,
+): Promise<void> {
+  await db.delete(strategies).where(eq(strategies.id, id));
+}
+
+// ---------------------------------------------------------------------------
+// Account Operations
+// ---------------------------------------------------------------------------
+
+/**
+ * Insert a new account and return its ID.
+ */
+export async function insertAccount(
+  db: BotDatabase,
+  data: InsertAccount,
+): Promise<number> {
+  const validated = InsertAccountSchema.parse(data);
+  const result = await db
+    .insert(accounts)
+    .values(validated)
+    .returning({ id: accounts.id });
+  return result[0].id;
+}
+
+/**
+ * Get an account by ID.
+ */
+export async function getAccount(
+  db: BotDatabase,
+  id: number,
+): Promise<AccountRow | null> {
+  const rows = await db
+    .select()
+    .from(accounts)
+    .where(eq(accounts.id, id))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/**
+ * Get an account by its unique name.
+ */
+export async function getAccountByName(
+  db: BotDatabase,
+  name: string,
+): Promise<AccountRow | null> {
+  const rows = await db
+    .select()
+    .from(accounts)
+    .where(eq(accounts.name, name))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/**
+ * Get all active accounts.
+ */
+export async function getActiveAccounts(
+  db: BotDatabase,
+): Promise<AccountRow[]> {
+  return db
+    .select()
+    .from(accounts)
+    .where(eq(accounts.isActive, true))
+    .orderBy(desc(accounts.id));
+}
+
+/**
+ * Update an account's fields.
+ */
+export async function updateAccount(
+  db: BotDatabase,
+  id: number,
+  data: Partial<{
+    name: string;
+    igApiKey: string;
+    igUsername: string;
+    igPassword: string;
+    isDemo: boolean;
+    strategyId: number;
+    intervalMinutes: number;
+    timezone: string;
+    isActive: boolean;
+  }>,
+): Promise<void> {
+  await db
+    .update(accounts)
+    .set({
+      ...data,
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(accounts.id, id));
+}
+
+/**
+ * Delete an account by ID.
+ */
+export async function deleteAccount(
+  db: BotDatabase,
+  id: number,
+): Promise<void> {
+  await db.delete(accounts).where(eq(accounts.id, id));
 }
 
 // ---------------------------------------------------------------------------

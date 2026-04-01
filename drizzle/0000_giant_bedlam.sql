@@ -1,3 +1,21 @@
+CREATE TABLE `accounts` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`name` text NOT NULL,
+	`ig_api_key` text NOT NULL,
+	`ig_username` text NOT NULL,
+	`ig_password` text NOT NULL,
+	`is_demo` integer DEFAULT true NOT NULL,
+	`strategy_id` integer NOT NULL,
+	`interval_minutes` integer DEFAULT 15 NOT NULL,
+	`timezone` text DEFAULT 'Europe/London' NOT NULL,
+	`is_active` integer DEFAULT true NOT NULL,
+	`created_at` text NOT NULL,
+	`updated_at` text NOT NULL
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `accounts_name_unique` ON `accounts` (`name`);--> statement-breakpoint
+CREATE INDEX `accounts_strategy_id_idx` ON `accounts` (`strategy_id`);--> statement-breakpoint
+CREATE INDEX `accounts_is_active_idx` ON `accounts` (`is_active`);--> statement-breakpoint
 CREATE TABLE `bot_state` (
 	`key` text PRIMARY KEY NOT NULL,
 	`value` text NOT NULL,
@@ -6,6 +24,7 @@ CREATE TABLE `bot_state` (
 --> statement-breakpoint
 CREATE TABLE `positions` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`account_id` integer,
 	`deal_id` text NOT NULL,
 	`epic` text NOT NULL,
 	`direction` text NOT NULL,
@@ -29,8 +48,10 @@ CREATE TABLE `positions` (
 CREATE UNIQUE INDEX `positions_deal_id_unique` ON `positions` (`deal_id`);--> statement-breakpoint
 CREATE INDEX `positions_epic_idx` ON `positions` (`epic`);--> statement-breakpoint
 CREATE INDEX `positions_status_idx` ON `positions` (`status`);--> statement-breakpoint
+CREATE INDEX `positions_account_id_idx` ON `positions` (`account_id`);--> statement-breakpoint
 CREATE TABLE `signals` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`account_id` integer,
 	`tick_id` integer NOT NULL,
 	`epic` text NOT NULL,
 	`strategy` text NOT NULL,
@@ -50,8 +71,24 @@ CREATE TABLE `signals` (
 CREATE INDEX `signals_tick_id_idx` ON `signals` (`tick_id`);--> statement-breakpoint
 CREATE INDEX `signals_epic_idx` ON `signals` (`epic`);--> statement-breakpoint
 CREATE INDEX `signals_created_at_idx` ON `signals` (`created_at`);--> statement-breakpoint
+CREATE INDEX `signals_account_id_idx` ON `signals` (`account_id`);--> statement-breakpoint
+CREATE TABLE `strategies` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`name` text NOT NULL,
+	`prompt` text NOT NULL,
+	`strategy_type` text NOT NULL,
+	`strategy_params` text,
+	`risk_config` text,
+	`is_active` integer DEFAULT true NOT NULL,
+	`created_at` text NOT NULL,
+	`updated_at` text NOT NULL
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `strategies_name_unique` ON `strategies` (`name`);--> statement-breakpoint
+CREATE INDEX `strategies_is_active_idx` ON `strategies` (`is_active`);--> statement-breakpoint
 CREATE TABLE `ticks` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`account_id` integer,
 	`started_at` text NOT NULL,
 	`completed_at` text,
 	`status` text DEFAULT 'running' NOT NULL,
@@ -63,8 +100,10 @@ CREATE TABLE `ticks` (
 );
 --> statement-breakpoint
 CREATE INDEX `ticks_started_at_idx` ON `ticks` (`started_at`);--> statement-breakpoint
+CREATE INDEX `ticks_account_id_idx` ON `ticks` (`account_id`);--> statement-breakpoint
 CREATE TABLE `trades` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`account_id` integer,
 	`tick_id` integer NOT NULL,
 	`signal_id` integer,
 	`deal_reference` text,
@@ -87,4 +126,5 @@ CREATE TABLE `trades` (
 CREATE INDEX `trades_tick_id_idx` ON `trades` (`tick_id`);--> statement-breakpoint
 CREATE INDEX `trades_deal_id_idx` ON `trades` (`deal_id`);--> statement-breakpoint
 CREATE INDEX `trades_epic_idx` ON `trades` (`epic`);--> statement-breakpoint
-CREATE INDEX `trades_created_at_idx` ON `trades` (`created_at`);
+CREATE INDEX `trades_created_at_idx` ON `trades` (`created_at`);--> statement-breakpoint
+CREATE INDEX `trades_account_id_idx` ON `trades` (`account_id`);

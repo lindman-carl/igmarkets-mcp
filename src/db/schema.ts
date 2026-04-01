@@ -2,7 +2,9 @@
  * Drizzle ORM Schema - Trading Bot State Persistence
  *
  * SQLite tables for persisting bot state between ticks:
- * - ticks: record of each bot execution cycle
+ * - strategies: strategy definitions with markdown prompts
+ * - accounts: IG trading accounts, each linked to a strategy
+ * - ticks: record of each bot execution cycle (scoped per account)
  * - signals: strategy signals generated per tick
  * - trades: trade executions and their outcomes
  * - positions: tracked open positions and their lifecycle
@@ -13,6 +15,77 @@ import { sqliteTable, index } from "drizzle-orm/sqlite-core";
 import * as t from "drizzle-orm/sqlite-core";
 
 // ---------------------------------------------------------------------------
+// Strategies — named strategy configurations with markdown prompts
+// ---------------------------------------------------------------------------
+
+export const strategies = sqliteTable(
+  "strategies",
+  {
+    id: t.int().primaryKey({ autoIncrement: true }),
+    /** Unique strategy name */
+    name: t.text().notNull().unique(),
+    /**
+     * Free-form markdown prompt with YAML frontmatter header.
+     * The frontmatter contains structured metadata (tickers, risk params, etc.)
+     * and the body contains free-form trading rules / instructions.
+     */
+    prompt: t.text().notNull(),
+    /** Base strategy type (e.g. "trend-following", "breakout", or custom) */
+    strategyType: t.text("strategy_type").notNull(),
+    /** JSON blob with strategy parameters (SMA periods, ATR multipliers, etc.) */
+    strategyParams: t.text("strategy_params", { mode: "json" }),
+    /** JSON blob with risk configuration overrides */
+    riskConfig: t.text("risk_config", { mode: "json" }),
+    /** Whether this strategy is active and available for use */
+    isActive: t.int("is_active", { mode: "boolean" }).notNull().default(true),
+    /** ISO 8601 timestamp */
+    createdAt: t.text("created_at").notNull(),
+    /** ISO 8601 timestamp */
+    updatedAt: t.text("updated_at").notNull(),
+  },
+  (table) => [
+    index("strategies_is_active_idx").on(table.isActive),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// Accounts — IG trading accounts, each linked to a strategy
+// ---------------------------------------------------------------------------
+
+export const accounts = sqliteTable(
+  "accounts",
+  {
+    id: t.int().primaryKey({ autoIncrement: true }),
+    /** Unique account display name (e.g. "UK Indices Demo") */
+    name: t.text().notNull().unique(),
+    /** IG Markets API key */
+    igApiKey: t.text("ig_api_key").notNull(),
+    /** IG account username/identifier */
+    igUsername: t.text("ig_username").notNull(),
+    /** IG account password */
+    igPassword: t.text("ig_password").notNull(),
+    /** Use demo environment */
+    isDemo: t.int("is_demo", { mode: "boolean" }).notNull().default(true),
+    /** FK to strategies table */
+    strategyId: t.int("strategy_id").notNull(),
+    /** Tick interval in minutes (5, 10, 15, 60) */
+    intervalMinutes: t.int("interval_minutes").notNull().default(15),
+    /** IANA timezone (e.g. "Europe/London") */
+    timezone: t.text().notNull().default("Europe/London"),
+    /** Whether this account is active and should be processed */
+    isActive: t.int("is_active", { mode: "boolean" }).notNull().default(true),
+    /** ISO 8601 timestamp */
+    createdAt: t.text("created_at").notNull(),
+    /** ISO 8601 timestamp */
+    updatedAt: t.text("updated_at").notNull(),
+  },
+  (table) => [
+    index("accounts_strategy_id_idx").on(table.strategyId),
+    index("accounts_is_active_idx").on(table.isActive),
+  ],
+);
+
+// ---------------------------------------------------------------------------
 // Ticks — one row per bot execution cycle
 // ---------------------------------------------------------------------------
 
@@ -20,6 +93,8 @@ export const ticks = sqliteTable(
   "ticks",
   {
     id: t.int().primaryKey({ autoIncrement: true }),
+    /** FK to accounts table (null for legacy single-account ticks) */
+    accountId: t.int("account_id"),
     /** ISO 8601 timestamp of tick start */
     startedAt: t.text("started_at").notNull(),
     /** ISO 8601 timestamp of tick end */
@@ -37,7 +112,10 @@ export const ticks = sqliteTable(
     /** Free-form JSON metadata */
     metadata: t.text({ mode: "json" }),
   },
-  (table) => [index("ticks_started_at_idx").on(table.startedAt)],
+  (table) => [
+    index("ticks_started_at_idx").on(table.startedAt),
+    index("ticks_account_id_idx").on(table.accountId),
+  ],
 );
 
 // ---------------------------------------------------------------------------
@@ -48,6 +126,8 @@ export const signals = sqliteTable(
   "signals",
   {
     id: t.int().primaryKey({ autoIncrement: true }),
+    /** FK to accounts table */
+    accountId: t.int("account_id"),
     tickId: t.int("tick_id").notNull(),
     /** Instrument epic (e.g. "IX.D.FTSE.DAILY.IP") */
     epic: t.text().notNull(),
@@ -80,6 +160,7 @@ export const signals = sqliteTable(
     index("signals_tick_id_idx").on(table.tickId),
     index("signals_epic_idx").on(table.epic),
     index("signals_created_at_idx").on(table.createdAt),
+    index("signals_account_id_idx").on(table.accountId),
   ],
 );
 
@@ -91,6 +172,8 @@ export const trades = sqliteTable(
   "trades",
   {
     id: t.int().primaryKey({ autoIncrement: true }),
+    /** FK to accounts table */
+    accountId: t.int("account_id"),
     tickId: t.int("tick_id").notNull(),
     signalId: t.int("signal_id"),
     /** IG deal reference returned from trade operation */
@@ -127,6 +210,7 @@ export const trades = sqliteTable(
     index("trades_deal_id_idx").on(table.dealId),
     index("trades_epic_idx").on(table.epic),
     index("trades_created_at_idx").on(table.createdAt),
+    index("trades_account_id_idx").on(table.accountId),
   ],
 );
 
@@ -138,6 +222,8 @@ export const positions = sqliteTable(
   "positions",
   {
     id: t.int().primaryKey({ autoIncrement: true }),
+    /** FK to accounts table */
+    accountId: t.int("account_id"),
     /** IG deal ID */
     dealId: t.text("deal_id").notNull().unique(),
     epic: t.text().notNull(),
@@ -176,6 +262,7 @@ export const positions = sqliteTable(
   (table) => [
     index("positions_epic_idx").on(table.epic),
     index("positions_status_idx").on(table.status),
+    index("positions_account_id_idx").on(table.accountId),
   ],
 );
 

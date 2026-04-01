@@ -1,9 +1,129 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "d15bf800-9dae-4b5b-905b-bbf1db493d25",
+  "id": "049e0ec2-1586-482f-8749-9b973192f662",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
+    "accounts": {
+      "name": "accounts",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ig_api_key": {
+          "name": "ig_api_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ig_username": {
+          "name": "ig_username",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ig_password": {
+          "name": "ig_password",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "is_demo": {
+          "name": "is_demo",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "strategy_id": {
+          "name": "strategy_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "interval_minutes": {
+          "name": "interval_minutes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 15
+        },
+        "timezone": {
+          "name": "timezone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'Europe/London'"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "accounts_name_unique": {
+          "name": "accounts_name_unique",
+          "columns": [
+            "name"
+          ],
+          "isUnique": true
+        },
+        "accounts_strategy_id_idx": {
+          "name": "accounts_strategy_id_idx",
+          "columns": [
+            "strategy_id"
+          ],
+          "isUnique": false
+        },
+        "accounts_is_active_idx": {
+          "name": "accounts_is_active_idx",
+          "columns": [
+            "is_active"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "bot_state": {
       "name": "bot_state",
       "columns": {
@@ -44,6 +164,13 @@
           "primaryKey": true,
           "notNull": true,
           "autoincrement": true
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         },
         "deal_id": {
           "name": "deal_id",
@@ -176,17 +303,30 @@
       "indexes": {
         "positions_deal_id_unique": {
           "name": "positions_deal_id_unique",
-          "columns": ["deal_id"],
+          "columns": [
+            "deal_id"
+          ],
           "isUnique": true
         },
         "positions_epic_idx": {
           "name": "positions_epic_idx",
-          "columns": ["epic"],
+          "columns": [
+            "epic"
+          ],
           "isUnique": false
         },
         "positions_status_idx": {
           "name": "positions_status_idx",
-          "columns": ["status"],
+          "columns": [
+            "status"
+          ],
+          "isUnique": false
+        },
+        "positions_account_id_idx": {
+          "name": "positions_account_id_idx",
+          "columns": [
+            "account_id"
+          ],
           "isUnique": false
         }
       },
@@ -204,6 +344,13 @@
           "primaryKey": true,
           "notNull": true,
           "autoincrement": true
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         },
         "tick_id": {
           "name": "tick_id",
@@ -308,17 +455,119 @@
       "indexes": {
         "signals_tick_id_idx": {
           "name": "signals_tick_id_idx",
-          "columns": ["tick_id"],
+          "columns": [
+            "tick_id"
+          ],
           "isUnique": false
         },
         "signals_epic_idx": {
           "name": "signals_epic_idx",
-          "columns": ["epic"],
+          "columns": [
+            "epic"
+          ],
           "isUnique": false
         },
         "signals_created_at_idx": {
           "name": "signals_created_at_idx",
-          "columns": ["created_at"],
+          "columns": [
+            "created_at"
+          ],
+          "isUnique": false
+        },
+        "signals_account_id_idx": {
+          "name": "signals_account_id_idx",
+          "columns": [
+            "account_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "strategies": {
+      "name": "strategies",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "prompt": {
+          "name": "prompt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "strategy_type": {
+          "name": "strategy_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "strategy_params": {
+          "name": "strategy_params",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "risk_config": {
+          "name": "risk_config",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "strategies_name_unique": {
+          "name": "strategies_name_unique",
+          "columns": [
+            "name"
+          ],
+          "isUnique": true
+        },
+        "strategies_is_active_idx": {
+          "name": "strategies_is_active_idx",
+          "columns": [
+            "is_active"
+          ],
           "isUnique": false
         }
       },
@@ -336,6 +585,13 @@
           "primaryKey": true,
           "notNull": true,
           "autoincrement": true
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         },
         "started_at": {
           "name": "started_at",
@@ -401,7 +657,16 @@
       "indexes": {
         "ticks_started_at_idx": {
           "name": "ticks_started_at_idx",
-          "columns": ["started_at"],
+          "columns": [
+            "started_at"
+          ],
+          "isUnique": false
+        },
+        "ticks_account_id_idx": {
+          "name": "ticks_account_id_idx",
+          "columns": [
+            "account_id"
+          ],
           "isUnique": false
         }
       },
@@ -419,6 +684,13 @@
           "primaryKey": true,
           "notNull": true,
           "autoincrement": true
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         },
         "tick_id": {
           "name": "tick_id",
@@ -544,22 +816,37 @@
       "indexes": {
         "trades_tick_id_idx": {
           "name": "trades_tick_id_idx",
-          "columns": ["tick_id"],
+          "columns": [
+            "tick_id"
+          ],
           "isUnique": false
         },
         "trades_deal_id_idx": {
           "name": "trades_deal_id_idx",
-          "columns": ["deal_id"],
+          "columns": [
+            "deal_id"
+          ],
           "isUnique": false
         },
         "trades_epic_idx": {
           "name": "trades_epic_idx",
-          "columns": ["epic"],
+          "columns": [
+            "epic"
+          ],
           "isUnique": false
         },
         "trades_created_at_idx": {
           "name": "trades_created_at_idx",
-          "columns": ["created_at"],
+          "columns": [
+            "created_at"
+          ],
+          "isUnique": false
+        },
+        "trades_account_id_idx": {
+          "name": "trades_account_id_idx",
+          "columns": [
+            "account_id"
+          ],
           "isUnique": false
         }
       },

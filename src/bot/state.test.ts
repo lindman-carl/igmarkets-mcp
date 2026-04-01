@@ -29,6 +29,18 @@ import {
   getCircuitBreakerState,
   setCircuitBreakerState,
   getTickSummary,
+  insertStrategy,
+  getStrategy,
+  getStrategyByName,
+  getActiveStrategies,
+  updateStrategy,
+  deleteStrategy,
+  insertAccount,
+  getAccount,
+  getAccountByName,
+  getActiveAccounts,
+  updateAccount,
+  deleteAccount,
 } from "./state.js";
 import { DEFAULT_CIRCUIT_BREAKER_STATE } from "./schemas.js";
 
@@ -45,6 +57,31 @@ function createTestDb(): BotDatabase {
 
   // Apply schema manually (same DDL as the migration file)
   sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS strategies (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+      name           TEXT NOT NULL UNIQUE,
+      prompt         TEXT NOT NULL,
+      strategy_type  TEXT NOT NULL,
+      strategy_params TEXT,
+      risk_config    TEXT,
+      is_active      INTEGER DEFAULT true NOT NULL,
+      created_at     TEXT NOT NULL,
+      updated_at     TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS accounts (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+      name             TEXT NOT NULL UNIQUE,
+      ig_api_key       TEXT NOT NULL,
+      ig_username      TEXT NOT NULL,
+      ig_password      TEXT NOT NULL,
+      is_demo          INTEGER DEFAULT true NOT NULL,
+      strategy_id      INTEGER NOT NULL,
+      interval_minutes INTEGER DEFAULT 15 NOT NULL,
+      timezone         TEXT DEFAULT 'Europe/London' NOT NULL,
+      is_active        INTEGER DEFAULT true NOT NULL,
+      created_at       TEXT NOT NULL,
+      updated_at       TEXT NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS bot_state (
       key   TEXT PRIMARY KEY NOT NULL,
       value TEXT NOT NULL,
@@ -52,6 +89,7 @@ function createTestDb(): BotDatabase {
     );
     CREATE TABLE IF NOT EXISTS positions (
       id            INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+      account_id    INTEGER,
       deal_id       TEXT NOT NULL UNIQUE,
       epic          TEXT NOT NULL,
       direction     TEXT NOT NULL,
@@ -73,6 +111,7 @@ function createTestDb(): BotDatabase {
     );
     CREATE TABLE IF NOT EXISTS signals (
       id              INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+      account_id      INTEGER,
       tick_id         INTEGER NOT NULL,
       epic            TEXT NOT NULL,
       strategy        TEXT NOT NULL,
@@ -90,6 +129,7 @@ function createTestDb(): BotDatabase {
     );
     CREATE TABLE IF NOT EXISTS ticks (
       id                  INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+      account_id          INTEGER,
       started_at          TEXT NOT NULL,
       completed_at        TEXT,
       status              TEXT DEFAULT 'running' NOT NULL,
@@ -101,6 +141,7 @@ function createTestDb(): BotDatabase {
     );
     CREATE TABLE IF NOT EXISTS trades (
       id               INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+      account_id       INTEGER,
       tick_id          INTEGER NOT NULL,
       signal_id        INTEGER,
       deal_reference   TEXT,
@@ -595,5 +636,361 @@ describe("getTickSummary", () => {
     const summary = await getTickSummary(db, "2000-01-01T00:00:00.000Z");
     expect(summary.totalSignals).toBe(1);
     expect(summary.totalTrades).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Strategy CRUD operations
+// ---------------------------------------------------------------------------
+
+describe("strategy CRUD", () => {
+  let db: BotDatabase;
+  beforeEach(() => {
+    db = createTestDb();
+  });
+
+  const STRATEGY_DATA = {
+    name: "FTSE Trend Follower",
+    prompt: "---\nstrategyType: trend-following\n---\n\nBuy on SMA crossover.",
+    strategyType: "trend-following",
+    createdAt: NOW,
+    updatedAt: NOW,
+  };
+
+  it("insertStrategy returns a numeric id", async () => {
+    const id = await insertStrategy(db, STRATEGY_DATA);
+    expect(typeof id).toBe("number");
+    expect(id).toBeGreaterThan(0);
+  });
+
+  it("getStrategy retrieves a strategy by ID", async () => {
+    const id = await insertStrategy(db, STRATEGY_DATA);
+    const row = await getStrategy(db, id);
+    expect(row).not.toBeNull();
+    expect(row!.name).toBe("FTSE Trend Follower");
+    expect(row!.strategyType).toBe("trend-following");
+    expect(row!.prompt).toContain("Buy on SMA crossover");
+    expect(row!.isActive).toBe(true);
+  });
+
+  it("getStrategy returns null for unknown ID", async () => {
+    const row = await getStrategy(db, 999);
+    expect(row).toBeNull();
+  });
+
+  it("getStrategyByName retrieves a strategy by name", async () => {
+    await insertStrategy(db, STRATEGY_DATA);
+    const row = await getStrategyByName(db, "FTSE Trend Follower");
+    expect(row).not.toBeNull();
+    expect(row!.strategyType).toBe("trend-following");
+  });
+
+  it("getStrategyByName returns null for unknown name", async () => {
+    const row = await getStrategyByName(db, "nonexistent");
+    expect(row).toBeNull();
+  });
+
+  it("getActiveStrategies returns only active strategies", async () => {
+    await insertStrategy(db, STRATEGY_DATA);
+    await insertStrategy(db, {
+      ...STRATEGY_DATA,
+      name: "Inactive Strategy",
+      isActive: false,
+    });
+
+    const active = await getActiveStrategies(db);
+    expect(active).toHaveLength(1);
+    expect(active[0].name).toBe("FTSE Trend Follower");
+  });
+
+  it("updateStrategy modifies fields and sets updatedAt", async () => {
+    const id = await insertStrategy(db, STRATEGY_DATA);
+    await updateStrategy(db, id, {
+      name: "Renamed Strategy",
+      strategyType: "breakout",
+    });
+
+    const row = await getStrategy(db, id);
+    expect(row!.name).toBe("Renamed Strategy");
+    expect(row!.strategyType).toBe("breakout");
+    // updatedAt should have changed
+    expect(row!.updatedAt).not.toBe(NOW);
+  });
+
+  it("updateStrategy can deactivate a strategy", async () => {
+    const id = await insertStrategy(db, STRATEGY_DATA);
+    await updateStrategy(db, id, { isActive: false });
+
+    const row = await getStrategy(db, id);
+    expect(row!.isActive).toBe(false);
+
+    const active = await getActiveStrategies(db);
+    expect(active).toHaveLength(0);
+  });
+
+  it("deleteStrategy removes the strategy", async () => {
+    const id = await insertStrategy(db, STRATEGY_DATA);
+    await deleteStrategy(db, id);
+
+    const row = await getStrategy(db, id);
+    expect(row).toBeNull();
+  });
+
+  it("enforces unique name constraint", async () => {
+    await insertStrategy(db, STRATEGY_DATA);
+    await expect(insertStrategy(db, STRATEGY_DATA)).rejects.toThrow();
+  });
+
+  it("stores and retrieves JSON strategyParams", async () => {
+    const id = await insertStrategy(db, {
+      ...STRATEGY_DATA,
+      name: "With Params",
+      strategyParams: { smaPeriodFast: 5, smaPeriodSlow: 20 },
+    });
+
+    const row = await getStrategy(db, id);
+    expect(row!.strategyParams).toEqual({ smaPeriodFast: 5, smaPeriodSlow: 20 });
+  });
+
+  it("stores and retrieves JSON riskConfig", async () => {
+    const id = await insertStrategy(db, {
+      ...STRATEGY_DATA,
+      name: "With Risk",
+      riskConfig: { maxRiskPerTradePct: 0.02, maxOpenPositions: 3 },
+    });
+
+    const row = await getStrategy(db, id);
+    expect(row!.riskConfig).toEqual({
+      maxRiskPerTradePct: 0.02,
+      maxOpenPositions: 3,
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Account CRUD operations
+// ---------------------------------------------------------------------------
+
+describe("account CRUD", () => {
+  let db: BotDatabase;
+  let strategyId: number;
+
+  beforeEach(async () => {
+    db = createTestDb();
+    strategyId = await insertStrategy(db, {
+      name: "Test Strategy",
+      prompt: "---\nstrategyType: breakout\n---\n\nTest.",
+      strategyType: "breakout",
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
+  });
+
+  function accountData(overrides: Record<string, unknown> = {}) {
+    return {
+      name: "UK Indices Demo",
+      igApiKey: "test-api-key",
+      igUsername: "test-user",
+      igPassword: "test-pass",
+      isDemo: true,
+      strategyId,
+      createdAt: NOW,
+      updatedAt: NOW,
+      ...overrides,
+    };
+  }
+
+  it("insertAccount returns a numeric id", async () => {
+    const id = await insertAccount(db, accountData());
+    expect(typeof id).toBe("number");
+    expect(id).toBeGreaterThan(0);
+  });
+
+  it("getAccount retrieves an account by ID", async () => {
+    const id = await insertAccount(db, accountData());
+    const row = await getAccount(db, id);
+    expect(row).not.toBeNull();
+    expect(row!.name).toBe("UK Indices Demo");
+    expect(row!.igApiKey).toBe("test-api-key");
+    expect(row!.igUsername).toBe("test-user");
+    expect(row!.isDemo).toBe(true);
+    expect(row!.strategyId).toBe(strategyId);
+    expect(row!.intervalMinutes).toBe(15);
+    expect(row!.timezone).toBe("Europe/London");
+    expect(row!.isActive).toBe(true);
+  });
+
+  it("getAccount returns null for unknown ID", async () => {
+    const row = await getAccount(db, 999);
+    expect(row).toBeNull();
+  });
+
+  it("getAccountByName retrieves an account by name", async () => {
+    await insertAccount(db, accountData());
+    const row = await getAccountByName(db, "UK Indices Demo");
+    expect(row).not.toBeNull();
+    expect(row!.igUsername).toBe("test-user");
+  });
+
+  it("getAccountByName returns null for unknown name", async () => {
+    const row = await getAccountByName(db, "nonexistent");
+    expect(row).toBeNull();
+  });
+
+  it("getActiveAccounts returns only active accounts", async () => {
+    await insertAccount(db, accountData());
+    await insertAccount(db, accountData({
+      name: "Inactive Account",
+      isActive: false,
+    }));
+
+    const active = await getActiveAccounts(db);
+    expect(active).toHaveLength(1);
+    expect(active[0].name).toBe("UK Indices Demo");
+  });
+
+  it("updateAccount modifies fields and sets updatedAt", async () => {
+    const id = await insertAccount(db, accountData());
+    await updateAccount(db, id, {
+      name: "Renamed Account",
+      intervalMinutes: 60,
+    });
+
+    const row = await getAccount(db, id);
+    expect(row!.name).toBe("Renamed Account");
+    expect(row!.intervalMinutes).toBe(60);
+    expect(row!.updatedAt).not.toBe(NOW);
+  });
+
+  it("updateAccount can deactivate an account", async () => {
+    const id = await insertAccount(db, accountData());
+    await updateAccount(db, id, { isActive: false });
+
+    const row = await getAccount(db, id);
+    expect(row!.isActive).toBe(false);
+
+    const active = await getActiveAccounts(db);
+    expect(active).toHaveLength(0);
+  });
+
+  it("updateAccount can change strategy", async () => {
+    const newStrategyId = await insertStrategy(db, {
+      name: "New Strategy",
+      prompt: "---\nstrategyType: mean-reversion\n---\n",
+      strategyType: "mean-reversion",
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
+
+    const id = await insertAccount(db, accountData());
+    await updateAccount(db, id, { strategyId: newStrategyId });
+
+    const row = await getAccount(db, id);
+    expect(row!.strategyId).toBe(newStrategyId);
+  });
+
+  it("deleteAccount removes the account", async () => {
+    const id = await insertAccount(db, accountData());
+    await deleteAccount(db, id);
+
+    const row = await getAccount(db, id);
+    expect(row).toBeNull();
+  });
+
+  it("enforces unique name constraint", async () => {
+    await insertAccount(db, accountData());
+    await expect(insertAccount(db, accountData())).rejects.toThrow();
+  });
+
+  it("stores custom interval and timezone", async () => {
+    const id = await insertAccount(db, accountData({
+      name: "US Account",
+      intervalMinutes: 5,
+      timezone: "America/New_York",
+      isDemo: false,
+    }));
+
+    const row = await getAccount(db, id);
+    expect(row!.intervalMinutes).toBe(5);
+    expect(row!.timezone).toBe("America/New_York");
+    expect(row!.isDemo).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Circuit breaker per-account scoping
+// ---------------------------------------------------------------------------
+
+describe("circuit breaker per-account scoping", () => {
+  let db: BotDatabase;
+  beforeEach(() => {
+    db = createTestDb();
+  });
+
+  it("global and per-account circuit breaker states are independent", async () => {
+    const global = { ...DEFAULT_CIRCUIT_BREAKER_STATE, consecutiveLosses: 1 };
+    const account1 = { ...DEFAULT_CIRCUIT_BREAKER_STATE, consecutiveLosses: 2 };
+    const account2 = { ...DEFAULT_CIRCUIT_BREAKER_STATE, consecutiveLosses: 3 };
+
+    await setCircuitBreakerState(db, global);
+    await setCircuitBreakerState(db, account1, 1);
+    await setCircuitBreakerState(db, account2, 2);
+
+    expect((await getCircuitBreakerState(db)).consecutiveLosses).toBe(1);
+    expect((await getCircuitBreakerState(db, 1)).consecutiveLosses).toBe(2);
+    expect((await getCircuitBreakerState(db, 2)).consecutiveLosses).toBe(3);
+  });
+
+  it("returns default for uninitialized per-account state", async () => {
+    const state = await getCircuitBreakerState(db, 42);
+    expect(state).toEqual(DEFAULT_CIRCUIT_BREAKER_STATE);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getOpenPositions with accountId filter
+// ---------------------------------------------------------------------------
+
+describe("getOpenPositions with accountId filter", () => {
+  let db: BotDatabase;
+  beforeEach(() => {
+    db = createTestDb();
+  });
+
+  it("filters positions by accountId", async () => {
+    // Insert positions - some with accountId, some without
+    // We need to insert directly since InsertPositionSchema doesn't have accountId
+    // Use the db directly for these test inserts
+    await insertPosition(db, {
+      dealId: "DEAL_A1",
+      epic: "EPIC_A",
+      direction: "BUY",
+      size: 1,
+      entryPrice: 100,
+      currencyCode: "GBP",
+      expiry: "DFB",
+      openedAt: NOW,
+      status: "open",
+    });
+
+    await insertPosition(db, {
+      dealId: "DEAL_A2",
+      epic: "EPIC_B",
+      direction: "SELL",
+      size: 2,
+      entryPrice: 200,
+      currencyCode: "USD",
+      expiry: "DFB",
+      openedAt: NOW,
+      status: "open",
+    });
+
+    // Without filter — returns all open
+    const all = await getOpenPositions(db);
+    expect(all).toHaveLength(2);
+
+    // With accountId filter — since we didn't set accountId, filtering by 1 returns none
+    const filtered = await getOpenPositions(db, 1);
+    expect(filtered).toHaveLength(0);
   });
 });
