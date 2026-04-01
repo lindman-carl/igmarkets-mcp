@@ -37,6 +37,8 @@ export interface ExecuteTradeParams {
   watchlistItem: WatchlistItem;
   tickId: number;
   signalId: number;
+  /** Account ID for multi-account scoping (null = legacy single-account mode). */
+  accountId?: number;
 }
 
 /** Result of a trade execution attempt. */
@@ -59,6 +61,8 @@ export interface ClosePositionParams {
   signalId: number | null;
   currencyCode: string;
   expiry: string;
+  /** Account ID for multi-account scoping (null = legacy single-account mode). */
+  accountId?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -78,7 +82,7 @@ export async function executeOpenTrade(
   db: BotDatabase,
   params: ExecuteTradeParams,
 ): Promise<ExecuteTradeResult> {
-  const { signal, sizing, watchlistItem, tickId, signalId } = params;
+  const { signal, sizing, watchlistItem, tickId, signalId, accountId } = params;
 
   if (!sizing.approved) {
     return {
@@ -108,7 +112,7 @@ export async function executeOpenTrade(
     currencyCode: watchlistItem.currencyCode,
     expiry: watchlistItem.expiry,
     createdAt: now,
-  });
+  }, accountId);
 
   try {
     // Execute the trade via IG API
@@ -183,7 +187,7 @@ export async function executeOpenTrade(
         expiry: watchlistItem.expiry,
         openedAt: now,
         openTradeId: tradeId,
-      });
+      }, accountId);
 
       return {
         success: true,
@@ -248,6 +252,7 @@ export async function executeCloseTrade(
     signalId,
     currencyCode,
     expiry,
+    accountId,
   } = params;
   const now = new Date().toISOString();
 
@@ -267,7 +272,7 @@ export async function executeCloseTrade(
     currencyCode,
     expiry,
     createdAt: now,
-  });
+  }, accountId);
 
   try {
     // Close via IG API (DELETE /positions/otc with body via _method override)

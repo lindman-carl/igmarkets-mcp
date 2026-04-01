@@ -1,8 +1,17 @@
 /**
- * Trading Bot — Trigger.dev Scheduled Task
+ * Trading Bot — Trigger.dev Scheduled Tasks
  *
  * This is the Trigger.dev entry point for the automated trading bot.
- * It runs on a configurable cron schedule and executes one tick per invocation.
+ * It provides three tasks:
+ *
+ *   1. `trading-bot` — Original single-account scheduled task
+ *      Runs on a configurable cron schedule using env vars / config file.
+ *
+ *   2. `trading-bot-multi` — Multi-account scheduled task
+ *      Iterates all active accounts in the database, loading each account's
+ *      linked strategy, and executes a tick for each one.
+ *
+ *   3. `trading-bot-manual` — Manual one-off task (for testing)
  *
  * Configuration is loaded from environment variables:
  *   IG_API_KEY, IG_USERNAME, IG_PASSWORD, IG_DEMO
@@ -20,13 +29,15 @@
  * (Mon–Fri 08:00–16:00 London time). Override via BOT_INTERVAL env var.
  */
 
-import { schedules, logger as triggerLogger } from "@trigger.dev/sdk/v3";
-import { executeTick } from "../bot/tick.js";
+import { schedules, logger as triggerLogger, task } from "@trigger.dev/sdk/v3";
+import { executeTick, executeAllAccountTicks } from "../bot/tick.js";
 import { loadBotConfig, buildCronExpression } from "../bot/config.js";
 import { createLogger, LOG_CATEGORIES } from "../bot/logger.js";
+import { createDatabase } from "../db/connection.js";
+import { runMigrations } from "../db/migrate.js";
 
 // ---------------------------------------------------------------------------
-// Scheduled Task Definition
+// Scheduled Task: Single-Account (original)
 // ---------------------------------------------------------------------------
 
 export const tradingBot = schedules.task({
@@ -91,10 +102,60 @@ export const tradingBot = schedules.task({
 });
 
 // ---------------------------------------------------------------------------
-// Manual Trigger Task (for testing / one-off runs)
+// Scheduled Task: Multi-Account
 // ---------------------------------------------------------------------------
 
-import { task } from "@trigger.dev/sdk/v3";
+export const tradingBotMulti = schedules.task({
+  id: "trading-bot-multi",
+  cron: {
+    pattern: "*/15 8-16 * * 1-5",
+    timezone: "Europe/London",
+  },
+  retry: {
+    maxAttempts: 1,
+  },
+  run: async (payload) => {
+    triggerLogger.info("Multi-account trading bot tick starting", {
+      timestamp: payload.timestamp.toISOString(),
+      lastTimestamp: payload.lastTimestamp?.toISOString() ?? "first run",
+      timezone: payload.timezone,
+    });
+
+    const dbPath = process.env.BOT_DB_PATH ?? "bot.db";
+    runMigrations(dbPath);
+    const db = createDatabase(dbPath);
+    const logger = createLogger("info");
+
+    const result = await executeAllAccountTicks({ db, logger });
+
+    triggerLogger.info("Multi-account trading bot tick completed", {
+      totalAccounts: result.totalAccounts,
+      durationMs: result.durationMs,
+      completed: result.results.filter((r) => r.tickResult.status === "completed").length,
+      skipped: result.results.filter((r) => r.tickResult.status === "skipped").length,
+      errors: result.results.filter((r) => r.tickResult.status === "error").length,
+    });
+
+    return {
+      totalAccounts: result.totalAccounts,
+      durationMs: result.durationMs,
+      accounts: result.results.map((r) => ({
+        accountId: r.accountId,
+        accountName: r.accountName,
+        strategyName: r.strategyName,
+        status: r.tickResult.status,
+        tickId: r.tickResult.tickId,
+        trades: r.tickResult.tradesExecuted,
+        signals: r.tickResult.signalsGenerated,
+        error: r.tickResult.error,
+      })),
+    };
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Manual Trigger Task (for testing / one-off runs)
+// ---------------------------------------------------------------------------
 
 export const tradingBotManual = task({
   id: "trading-bot-manual",

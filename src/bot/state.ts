@@ -67,15 +67,17 @@ export type {
 
 /**
  * Start a new tick and return its ID.
+ * @param accountId - Optional account ID for multi-account scoping
  */
 export async function startTick(
   db: BotDatabase,
   data: InsertTick,
+  accountId?: number,
 ): Promise<number> {
   const validated = InsertTickSchema.parse(data);
   const result = await db
     .insert(ticks)
-    .values(validated)
+    .values({ ...validated, accountId: accountId ?? null })
     .returning({ id: ticks.id });
   return result[0].id;
 }
@@ -139,15 +141,17 @@ export async function getRecentTicks(
 
 /**
  * Record a strategy signal generated during a tick.
+ * @param accountId - Optional account ID for multi-account scoping
  */
 export async function insertSignal(
   db: BotDatabase,
   data: InsertSignal,
+  accountId?: number,
 ): Promise<number> {
   const validated = InsertSignalSchema.parse(data);
   const result = await db
     .insert(signals)
-    .values(validated)
+    .values({ ...validated, accountId: accountId ?? null })
     .returning({ id: signals.id });
   return result[0].id;
 }
@@ -212,15 +216,17 @@ export async function getRecentSignals(
 
 /**
  * Record a trade execution.
+ * @param accountId - Optional account ID for multi-account scoping
  */
 export async function insertTrade(
   db: BotDatabase,
   data: InsertTrade,
+  accountId?: number,
 ): Promise<number> {
   const validated = InsertTradeSchema.parse(data);
   const result = await db
     .insert(trades)
-    .values(validated)
+    .values({ ...validated, accountId: accountId ?? null })
     .returning({ id: trades.id });
   return result[0].id;
 }
@@ -295,15 +301,17 @@ export async function getTradesToday(
 
 /**
  * Record a new tracked position.
+ * @param accountId - Optional account ID for multi-account scoping
  */
 export async function insertPosition(
   db: BotDatabase,
   data: InsertPosition,
+  accountId?: number,
 ): Promise<number> {
   const validated = InsertPositionSchema.parse(data);
   const result = await db
     .insert(positions)
-    .values(validated)
+    .values({ ...validated, accountId: accountId ?? null })
     .returning({ id: positions.id });
   return result[0].id;
 }

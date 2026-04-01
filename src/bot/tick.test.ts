@@ -16,11 +16,17 @@ import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import * as schema from "../db/schema.js";
 import type { BotDatabase } from "../db/connection.js";
-import { executeTick } from "./tick.js";
+import {
+  executeTick,
+  executeAccountTick,
+  executeAllAccountTicks,
+} from "./tick.js";
 import {
   setCircuitBreakerState,
   getLastTick,
   getRecentTicks,
+  insertStrategy,
+  insertAccount,
 } from "./state.js";
 import { DEFAULT_CIRCUIT_BREAKER_STATE } from "./schemas.js";
 import type { IGClient } from "../ig-client.js";
@@ -417,5 +423,302 @@ describe("executeTick — result structure", () => {
     const r2 = await executeTick({ config: BASE_CONFIG, db, client, skipAuth: true });
 
     expect(r2.tickId).toBeGreaterThan(r1.tickId);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Multi-account: executeAccountTick
+// ---------------------------------------------------------------------------
+
+describe("executeAccountTick", () => {
+  let db: BotDatabase;
+
+  beforeEach(() => {
+    db = createTestDb();
+  });
+
+  it("executes a tick using account credentials and strategy frontmatter", async () => {
+    const now = new Date().toISOString();
+
+    // Insert a strategy with frontmatter defining tickers
+    const strategyId = await insertStrategy(db, {
+      name: "FTSE Trend",
+      prompt: `---
+name: "FTSE Trend Follower"
+tickers:
+  - epic: "IX.D.FTSE.DAILY.IP"
+    expiry: "DFB"
+    currencyCode: "GBP"
+strategyType: "trend-following"
+riskPerTrade: 0.02
+maxOpenPositions: 2
+---
+
+## Rules
+
+Buy when SMA10 > SMA20.
+`,
+      strategyType: "trend-following",
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    // Insert an account linked to the strategy
+    const accountId = await insertAccount(db, {
+      name: "Test Account",
+      igApiKey: "test-key",
+      igUsername: "test-user",
+      igPassword: "test-pass",
+      isDemo: true,
+      strategyId,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    // Mock client that returns enough data for tick to complete
+    const mockRequest = vi.fn()
+      // GET /accounts
+      .mockResolvedValueOnce({
+        accounts: [{ accountId: "ACC_001", balance: { balance: 10000, available: 9000, profitLoss: 0 } }],
+      })
+      // GET /prices/.../DAY/30 — flat candles, no signals expected
+      .mockResolvedValueOnce(candlesToIgPrices(
+        Array.from({ length: 30 }, () => ({
+          open: 7500, high: 7505, low: 7495, close: 7500,
+        })),
+      ))
+      // GET /markets/... for sentiment
+      .mockResolvedValueOnce({ instrument: { marketId: "FTSE" } })
+      // GET /clientsentiment/FTSE
+      .mockResolvedValueOnce({ longPositionPercentage: 50, shortPositionPercentage: 50 })
+      .mockResolvedValue({});
+
+    const client = createMockClient({ request: mockRequest });
+
+    // Load the account and strategy rows back from DB
+    const { getAccount, getStrategy } = await import("./state.js");
+    const account = await getAccount(db, accountId);
+    const strategy = await getStrategy(db, strategyId);
+
+    expect(account).not.toBeNull();
+    expect(strategy).not.toBeNull();
+
+    const result = await executeAccountTick({
+      account: account!,
+      strategy: strategy!,
+      db,
+      client,
+      skipAuth: true,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.tickId).toBeGreaterThan(0);
+    expect(result.error).toBeNull();
+
+    // Verify the tick was recorded with the account ID
+    const recentTicks = await getRecentTicks(db, 1);
+    expect(recentTicks[0].accountId).toBe(accountId);
+  });
+
+  it("returns error if strategy has no tickers in frontmatter", async () => {
+    const now = new Date().toISOString();
+
+    const strategyId = await insertStrategy(db, {
+      name: "Empty Strategy",
+      prompt: `---
+name: "No Tickers"
+strategyType: "trend-following"
+---
+
+No tickers defined.
+`,
+      strategyType: "trend-following",
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const accountId = await insertAccount(db, {
+      name: "Test Account 2",
+      igApiKey: "test-key",
+      igUsername: "test-user",
+      igPassword: "test-pass",
+      isDemo: true,
+      strategyId,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const { getAccount, getStrategy } = await import("./state.js");
+    const account = await getAccount(db, accountId);
+    const strategy = await getStrategy(db, strategyId);
+
+    const result = await executeAccountTick({
+      account: account!,
+      strategy: strategy!,
+      db,
+      skipAuth: true,
+    });
+
+    expect(result.status).toBe("error");
+    expect(result.error).toContain("no tickers");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Multi-account: executeAllAccountTicks
+// ---------------------------------------------------------------------------
+
+describe("executeAllAccountTicks", () => {
+  let db: BotDatabase;
+
+  beforeEach(() => {
+    db = createTestDb();
+  });
+
+  it("returns empty results when no active accounts exist", async () => {
+    const result = await executeAllAccountTicks({ db });
+
+    expect(result.totalAccounts).toBe(0);
+    expect(result.results).toHaveLength(0);
+    expect(result.durationMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it("skips accounts with inactive strategies", async () => {
+    const now = new Date().toISOString();
+
+    const strategyId = await insertStrategy(db, {
+      name: "Inactive Strategy",
+      prompt: `---
+tickers:
+  - epic: "IX.D.FTSE.DAILY.IP"
+    expiry: "DFB"
+    currencyCode: "GBP"
+strategyType: "trend-following"
+---
+Inactive.
+`,
+      strategyType: "trend-following",
+      isActive: false,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    await insertAccount(db, {
+      name: "Account With Inactive Strategy",
+      igApiKey: "key",
+      igUsername: "user",
+      igPassword: "pass",
+      isDemo: true,
+      strategyId,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const result = await executeAllAccountTicks({ db });
+
+    expect(result.totalAccounts).toBe(1);
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0].tickResult.status).toBe("skipped");
+    expect(result.results[0].tickResult.error).toContain("inactive");
+  });
+
+  it("reports error when strategy is missing from DB", async () => {
+    const now = new Date().toISOString();
+
+    await insertAccount(db, {
+      name: "Orphan Account",
+      igApiKey: "key",
+      igUsername: "user",
+      igPassword: "pass",
+      isDemo: true,
+      strategyId: 999, // does not exist
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const result = await executeAllAccountTicks({ db });
+
+    expect(result.totalAccounts).toBe(1);
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0].tickResult.status).toBe("error");
+    expect(result.results[0].tickResult.error).toContain("not found");
+    expect(result.results[0].strategyName).toContain("unknown");
+  });
+
+  it("processes multiple active accounts sequentially", async () => {
+    const now = new Date().toISOString();
+
+    // Create two strategies
+    const s1Id = await insertStrategy(db, {
+      name: "Strategy A",
+      prompt: `---
+tickers:
+  - epic: "IX.D.FTSE.DAILY.IP"
+    expiry: "DFB"
+    currencyCode: "GBP"
+strategyType: "trend-following"
+---
+Strategy A rules.
+`,
+      strategyType: "trend-following",
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const s2Id = await insertStrategy(db, {
+      name: "Strategy B",
+      prompt: `---
+tickers:
+  - epic: "CS.D.GBPUSD.TODAY.IP"
+    expiry: "DFB"
+    currencyCode: "USD"
+strategyType: "breakout"
+---
+Strategy B rules.
+`,
+      strategyType: "breakout",
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    // Create two accounts
+    await insertAccount(db, {
+      name: "Account A",
+      igApiKey: "key-a",
+      igUsername: "user-a",
+      igPassword: "pass-a",
+      isDemo: true,
+      strategyId: s1Id,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    await insertAccount(db, {
+      name: "Account B",
+      igApiKey: "key-b",
+      igUsername: "user-b",
+      igPassword: "pass-b",
+      isDemo: true,
+      strategyId: s2Id,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    // We can't easily mock the IGClient creation inside executeAllAccountTicks,
+    // but we can verify the function processes accounts and returns results.
+    // The actual executeTick will fail on login since skipAuth is not passed
+    // through executeAllAccountTicks (by design — it creates real clients).
+    // So we expect "error" results (auth failure), but 2 attempts.
+    const result = await executeAllAccountTicks({ db });
+
+    expect(result.totalAccounts).toBe(2);
+    expect(result.results).toHaveLength(2);
+    // Both should have attempted (not skipped)
+    expect(result.results[0].accountName).toBeDefined();
+    expect(result.results[1].accountName).toBeDefined();
+    // They will fail because we can't reach IG API, but they were processed
+    expect(result.results.every((r) =>
+      r.tickResult.status === "error" || r.tickResult.status === "completed"
+    )).toBe(true);
   });
 });

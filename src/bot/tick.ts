@@ -57,14 +57,23 @@ import {
   getState,
   setState,
   updatePositionLevels,
+  getActiveAccounts,
+  getStrategy,
 } from "./state.js";
-import type { PositionRow } from "./state.js";
+import type { PositionRow, AccountRow, StrategyRow } from "./state.js";
 import type {
   BotConfig,
   WatchlistItem,
   CircuitBreakerState,
+  StrategyName,
 } from "./schemas.js";
-import { parseBotConfig } from "./schemas.js";
+import {
+  parseBotConfig,
+  StrategyNameSchema,
+  DEFAULT_STRATEGY_PARAMS,
+  DEFAULT_RISK_CONFIG,
+} from "./schemas.js";
+import { parseStrategyPrompt } from "./prompt-parser.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -96,6 +105,8 @@ export interface TickOptions {
   logger?: Logger;
   /** If true, skip authentication (e.g. for testing with a mock client). */
   skipAuth?: boolean;
+  /** Account ID for multi-account scoping (null = legacy single-account mode). */
+  accountId?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -116,6 +127,7 @@ export async function executeTick(options: TickOptions): Promise<TickResult> {
   const logger = options.logger ?? createLogger("info");
   const db = options.db ?? createDatabaseWithMigrations(config.dbPath);
   let client = options.client ?? null;
+  const accountId = options.accountId ?? config.accountId;
 
   let tickId = 0;
   let instrumentsScanned = 0;
@@ -127,20 +139,21 @@ export async function executeTick(options: TickOptions): Promise<TickResult> {
     // Step 1: Start tick record
     // ------------------------------------------------------------------
     const now = new Date().toISOString();
-    tickId = await startTick(db, { startedAt: now, status: "running" });
+    tickId = await startTick(db, { startedAt: now, status: "running" }, accountId);
     logger.info(LOG_CATEGORIES.TICK, `Tick #${tickId} started`, {
       intervalMinutes: config.intervalMinutes,
       strategy: config.strategy,
       watchlistSize: config.watchlist.length,
+      accountId: accountId ?? null,
     });
 
     // ------------------------------------------------------------------
     // Step 2: Check circuit breaker
     // ------------------------------------------------------------------
-    let cbState = await getCircuitBreakerState(db);
+    let cbState = await getCircuitBreakerState(db, accountId);
 
     // Reset daily counters if it's a new trading day
-    cbState = await maybeResetDaily(db, cbState, logger);
+    cbState = await maybeResetDaily(db, cbState, logger, accountId);
 
     const cbCheck = checkCircuitBreaker(
       cbState,
@@ -153,7 +166,7 @@ export async function executeTick(options: TickOptions): Promise<TickResult> {
         LOG_CATEGORIES.CIRCUIT_BREAKER,
         `Circuit breaker blocked: ${cbCheck.reason}`,
       );
-      await setCircuitBreakerState(db, cbCheck.state);
+      await setCircuitBreakerState(db, cbCheck.state, accountId);
       await completeTick(db, tickId, {
         status: "skipped",
         completedAt: new Date().toISOString(),
@@ -205,7 +218,7 @@ export async function executeTick(options: TickOptions): Promise<TickResult> {
         LOG_CATEGORIES.CIRCUIT_BREAKER,
         `Circuit breaker blocked (balance check): ${cbCheckWithBalance.reason}`,
       );
-      await setCircuitBreakerState(db, cbCheckWithBalance.state);
+      await setCircuitBreakerState(db, cbCheckWithBalance.state, accountId);
       await completeTick(db, tickId, {
         status: "skipped",
         completedAt: new Date().toISOString(),
@@ -226,7 +239,7 @@ export async function executeTick(options: TickOptions): Promise<TickResult> {
     // ------------------------------------------------------------------
     // Step 4: Get existing tracked positions
     // ------------------------------------------------------------------
-    const trackedPositions = await getOpenPositions(db);
+    const trackedPositions = await getOpenPositions(db, accountId);
     const positionsByEpic = new Map<string, PositionRow>();
     for (const pos of trackedPositions) {
       positionsByEpic.set(pos.epic, pos);
@@ -300,7 +313,7 @@ export async function executeTick(options: TickOptions): Promise<TickResult> {
             suggestedLimit: signal.suggestedLimit ?? undefined,
             indicatorData: signal.indicatorData,
             createdAt: new Date().toISOString(),
-          });
+          }, accountId);
 
           logger.info(
             LOG_CATEGORIES.SIGNAL,
@@ -325,6 +338,7 @@ export async function executeTick(options: TickOptions): Promise<TickResult> {
                 tickId,
                 cbState,
                 logger,
+                accountId,
               );
               tradesExecuted++;
               await markSignalActed(db, signalId);
@@ -418,6 +432,7 @@ export async function executeTick(options: TickOptions): Promise<TickResult> {
           watchlistItem,
           tickId,
           signalId,
+          accountId,
         });
 
         if (result.success) {
@@ -458,7 +473,7 @@ export async function executeTick(options: TickOptions): Promise<TickResult> {
     // ------------------------------------------------------------------
     // Step 7: Save circuit breaker state
     // ------------------------------------------------------------------
-    await setCircuitBreakerState(db, cbState);
+    await setCircuitBreakerState(db, cbState, accountId);
 
     // ------------------------------------------------------------------
     // Step 8: Complete tick
@@ -504,9 +519,9 @@ export async function executeTick(options: TickOptions): Promise<TickResult> {
 
       // Record the error in circuit breaker
       try {
-        let cbState = await getCircuitBreakerState(db);
+        let cbState = await getCircuitBreakerState(db, accountId);
         cbState = recordError(cbState);
-        await setCircuitBreakerState(db, cbState);
+        await setCircuitBreakerState(db, cbState, accountId);
       } catch {
         // Ignore if DB is unavailable
       }
@@ -703,6 +718,7 @@ async function handleExitSignal(
   tickId: number,
   cbState: CircuitBreakerState,
   logger: Logger,
+  accountId?: number,
 ): Promise<CircuitBreakerState> {
   logger.info(
     LOG_CATEGORIES.EXECUTION,
@@ -718,6 +734,7 @@ async function handleExitSignal(
     signalId,
     currencyCode: position.currencyCode,
     expiry: position.expiry,
+    accountId,
   });
 
   if (result.success) {
@@ -843,18 +860,369 @@ async function maybeResetDaily(
   db: BotDatabase,
   cbState: CircuitBreakerState,
   logger: Logger,
+  accountId?: number,
 ): Promise<CircuitBreakerState> {
   const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
-  const lastResetDate = await getState<string>(db, LAST_RESET_DATE_KEY);
+  const resetKey = accountId != null
+    ? `${LAST_RESET_DATE_KEY}:account:${accountId}`
+    : LAST_RESET_DATE_KEY;
+  const lastResetDate = await getState<string>(db, resetKey);
 
   if (lastResetDate !== today) {
     logger.info(
       LOG_CATEGORIES.CIRCUIT_BREAKER,
       `New trading day: resetting daily counters`,
     );
-    await setState(db, LAST_RESET_DATE_KEY, today);
+    await setState(db, resetKey, today);
     return resetDaily(cbState);
   }
 
   return cbState;
+}
+
+// ---------------------------------------------------------------------------
+// Multi-Account: Types
+// ---------------------------------------------------------------------------
+
+/** Result of running a tick for a single account. */
+export interface AccountTickResult {
+  accountId: number;
+  accountName: string;
+  strategyName: string;
+  tickResult: TickResult;
+}
+
+/** Aggregated results from running all active accounts. */
+export interface MultiAccountTickResult {
+  totalAccounts: number;
+  results: AccountTickResult[];
+  durationMs: number;
+}
+
+/** Options for executeAccountTick. */
+export interface AccountTickOptions {
+  /** The account row from the database. */
+  account: AccountRow;
+  /** The strategy row from the database. */
+  strategy: StrategyRow;
+  /** Pre-created database instance. */
+  db: BotDatabase;
+  /** Logger instance (if not provided, one is created). */
+  logger?: Logger;
+  /** Pre-authenticated IG client instance (if not provided, one is created and logged in). */
+  client?: IGClient;
+  /** If true, skip authentication (e.g. for testing with a mock client). */
+  skipAuth?: boolean;
+}
+
+/** Options for executeAllAccountTicks. */
+export interface MultiAccountTickOptions {
+  /** Pre-created database instance. */
+  db: BotDatabase;
+  /** Logger instance (if not provided, one is created). */
+  logger?: Logger;
+  /** Path to the SQLite database file (used only if db is not provided). */
+  dbPath?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Multi-Account: Execute a single account tick
+// ---------------------------------------------------------------------------
+
+/**
+ * Execute a tick for a single account + strategy pair.
+ *
+ * This function:
+ * 1. Parses the strategy prompt frontmatter for tickers and overrides
+ * 2. Resolves the strategy type (from frontmatter, then strategy row, then default)
+ * 3. Builds a BotConfig from account credentials + strategy config
+ * 4. Creates an IGClient for this account (unless one is provided)
+ * 5. Calls executeTick() with accountId scoping
+ *
+ * @param options - Account tick options
+ * @returns TickResult from the underlying executeTick call
+ */
+export async function executeAccountTick(
+  options: AccountTickOptions,
+): Promise<TickResult> {
+  const { account, strategy, db } = options;
+  const logger = options.logger ?? createLogger("info");
+
+  logger.info(
+    LOG_CATEGORIES.TICK,
+    `Starting tick for account "${account.name}" with strategy "${strategy.name}"`,
+    { accountId: account.id, strategyId: strategy.id },
+  );
+
+  // Parse the strategy prompt to extract frontmatter overrides
+  const parsed = parseStrategyPrompt(strategy.prompt);
+  const { frontmatter } = parsed;
+
+  // Resolve the strategy type: frontmatter > strategy row > fallback
+  const strategyType = resolveStrategyType(
+    frontmatter.strategyType,
+    strategy.strategyType,
+  );
+
+  // Build the watchlist: frontmatter tickers take priority
+  const watchlist = frontmatter.tickers;
+  if (!watchlist || watchlist.length === 0) {
+    logger.warn(
+      LOG_CATEGORIES.TICK,
+      `Account "${account.name}": strategy "${strategy.name}" has no tickers in frontmatter`,
+    );
+    return {
+      tickId: 0,
+      status: "error",
+      instrumentsScanned: 0,
+      signalsGenerated: 0,
+      tradesExecuted: 0,
+      error: `Strategy "${strategy.name}" has no tickers defined in frontmatter`,
+      durationMs: 0,
+    };
+  }
+
+  // Build strategy params: merge defaults < strategy row < frontmatter
+  const rowStrategyParams =
+    strategy.strategyParams != null &&
+    typeof strategy.strategyParams === "object"
+      ? strategy.strategyParams
+      : {};
+  const frontmatterStrategyParams =
+    frontmatter.strategyParams != null &&
+    typeof frontmatter.strategyParams === "object"
+      ? frontmatter.strategyParams
+      : {};
+  const strategyParams = {
+    ...DEFAULT_STRATEGY_PARAMS,
+    ...rowStrategyParams,
+    ...frontmatterStrategyParams,
+  };
+
+  // Build risk config: merge defaults < strategy row < frontmatter overrides
+  const rowRiskConfig =
+    strategy.riskConfig != null && typeof strategy.riskConfig === "object"
+      ? strategy.riskConfig
+      : {};
+  const frontmatterRiskOverrides: Record<string, unknown> = {};
+  if (frontmatter.riskPerTrade != null) {
+    frontmatterRiskOverrides.maxRiskPerTradePct = frontmatter.riskPerTrade;
+  }
+  if (frontmatter.maxOpenPositions != null) {
+    frontmatterRiskOverrides.maxOpenPositions = frontmatter.maxOpenPositions;
+  }
+  const risk = {
+    ...DEFAULT_RISK_CONFIG,
+    ...rowRiskConfig,
+    ...frontmatterRiskOverrides,
+  };
+
+  // Build the BotConfig
+  const config: BotConfig = {
+    intervalMinutes: account.intervalMinutes as 5 | 10 | 15 | 60,
+    timezone: account.timezone,
+    apiKey: account.igApiKey,
+    username: account.igUsername,
+    password: account.igPassword,
+    isDemo: account.isDemo,
+    watchlist,
+    strategy: strategyType,
+    strategyParams,
+    risk,
+    dbPath: "bot.db", // Not used since we pass db directly
+    accountId: account.id,
+  };
+
+  // Create or use provided client
+  const client =
+    options.client ??
+    new IGClient({
+      apiKey: account.igApiKey,
+      username: account.igUsername,
+      password: account.igPassword,
+      isDemo: account.isDemo,
+    });
+
+  return executeTick({
+    config,
+    db,
+    client,
+    logger,
+    skipAuth: options.skipAuth,
+    accountId: account.id,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Multi-Account: Execute all active accounts
+// ---------------------------------------------------------------------------
+
+/**
+ * Execute ticks for all active accounts in the database.
+ *
+ * For each active account:
+ * 1. Loads the linked strategy
+ * 2. Calls executeAccountTick()
+ * 3. Aggregates results
+ *
+ * Accounts are processed sequentially to avoid IG API rate limits.
+ *
+ * @param options - Multi-account tick options
+ * @returns Aggregated results for all accounts
+ */
+export async function executeAllAccountTicks(
+  options: MultiAccountTickOptions,
+): Promise<MultiAccountTickResult> {
+  const startTime = Date.now();
+  const db = options.db;
+  const logger = options.logger ?? createLogger("info");
+
+  const activeAccounts = await getActiveAccounts(db);
+
+  if (activeAccounts.length === 0) {
+    logger.info(LOG_CATEGORIES.TICK, "No active accounts found, skipping");
+    return {
+      totalAccounts: 0,
+      results: [],
+      durationMs: Date.now() - startTime,
+    };
+  }
+
+  logger.info(
+    LOG_CATEGORIES.TICK,
+    `Processing ${activeAccounts.length} active account(s)`,
+    { accounts: activeAccounts.map((a) => a.name) },
+  );
+
+  const results: AccountTickResult[] = [];
+
+  for (const account of activeAccounts) {
+    // Load the linked strategy
+    const strategy = await getStrategy(db, account.strategyId);
+    if (!strategy) {
+      logger.error(
+        LOG_CATEGORIES.ERROR,
+        `Account "${account.name}" references missing strategy ID ${account.strategyId}`,
+      );
+      results.push({
+        accountId: account.id,
+        accountName: account.name,
+        strategyName: `unknown (id=${account.strategyId})`,
+        tickResult: {
+          tickId: 0,
+          status: "error",
+          instrumentsScanned: 0,
+          signalsGenerated: 0,
+          tradesExecuted: 0,
+          error: `Strategy ID ${account.strategyId} not found`,
+          durationMs: 0,
+        },
+      });
+      continue;
+    }
+
+    if (!strategy.isActive) {
+      logger.info(
+        LOG_CATEGORIES.TICK,
+        `Skipping account "${account.name}": strategy "${strategy.name}" is inactive`,
+      );
+      results.push({
+        accountId: account.id,
+        accountName: account.name,
+        strategyName: strategy.name,
+        tickResult: {
+          tickId: 0,
+          status: "skipped",
+          instrumentsScanned: 0,
+          signalsGenerated: 0,
+          tradesExecuted: 0,
+          error: `Strategy "${strategy.name}" is inactive`,
+          durationMs: 0,
+        },
+      });
+      continue;
+    }
+
+    try {
+      const tickResult = await executeAccountTick({
+        account,
+        strategy,
+        db,
+        logger,
+      });
+
+      results.push({
+        accountId: account.id,
+        accountName: account.name,
+        strategyName: strategy.name,
+        tickResult,
+      });
+
+      logger.info(
+        LOG_CATEGORIES.TICK,
+        `Account "${account.name}" tick completed: ${tickResult.status}`,
+        {
+          tickId: tickResult.tickId,
+          trades: tickResult.tradesExecuted,
+          signals: tickResult.signalsGenerated,
+        },
+      );
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      logger.error(
+        LOG_CATEGORIES.ERROR,
+        `Account "${account.name}" tick failed: ${errorMsg}`,
+      );
+      results.push({
+        accountId: account.id,
+        accountName: account.name,
+        strategyName: strategy.name,
+        tickResult: {
+          tickId: 0,
+          status: "error",
+          instrumentsScanned: 0,
+          signalsGenerated: 0,
+          tradesExecuted: 0,
+          error: errorMsg,
+          durationMs: 0,
+        },
+      });
+    }
+  }
+
+  const durationMs = Date.now() - startTime;
+  logger.info(
+    LOG_CATEGORIES.TICK,
+    `Multi-account tick completed: ${results.length} accounts in ${durationMs}ms`,
+    {
+      completed: results.filter((r) => r.tickResult.status === "completed").length,
+      skipped: results.filter((r) => r.tickResult.status === "skipped").length,
+      errors: results.filter((r) => r.tickResult.status === "error").length,
+    },
+  );
+
+  return {
+    totalAccounts: activeAccounts.length,
+    results,
+    durationMs,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Helper: Resolve Strategy Type
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve the strategy type from multiple sources into a valid StrategyName.
+ * Falls back to "trend-following" if no valid type is found.
+ */
+function resolveStrategyType(
+  frontmatterType?: string,
+  rowType?: string,
+): StrategyName {
+  const candidate = frontmatterType ?? rowType;
+  if (!candidate) return "trend-following";
+
+  const result = StrategyNameSchema.safeParse(candidate);
+  return result.success ? result.data : "trend-following";
 }

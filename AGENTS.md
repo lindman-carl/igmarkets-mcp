@@ -275,6 +275,7 @@ full documentation.
 - **Config file**: `bot-config.json` in project root
 - **Trigger.dev config**: `trigger.config.ts`
 - **Scheduled task**: `trading-bot` (cron, every 15min during market hours)
+- **Scheduled task**: `trading-bot-multi` (multi-account, cron, every 15min during market hours)
 - **Manual task**: `trading-bot-manual` (on-demand testing)
 - **Database**: SQLite via Drizzle ORM (`bot.db`)
 - **Strategies**: `trend-following`, `breakout`, `mean-reversion`, `sentiment-contrarian`
@@ -360,6 +361,38 @@ Account CRUD: `insertAccount`, `getAccount`, `getAccountByName`,
 
 Circuit breaker and position queries accept optional `accountId` for
 per-account scoping.
+
+### Multi-Account Tick Functions (tick.ts)
+
+`executeAccountTick(options)` — Execute a tick for a single account + strategy
+pair. Parses the strategy prompt frontmatter, resolves config from multiple
+sources (frontmatter > strategy row > defaults), creates an IGClient for the
+account, and calls `executeTick()` with `accountId` scoping.
+
+`executeAllAccountTicks(options)` — Iterate all active accounts in the DB, load
+each account's linked strategy, and call `executeAccountTick()` sequentially
+(to avoid IG API rate limits). Returns aggregated `MultiAccountTickResult`.
+
+`resolveStrategyType(frontmatterType?, rowType?)` — Validate a strategy name
+against `StrategyNameSchema` and fall back to `"trend-following"`.
+
+Config resolution order (highest priority first):
+1. Strategy prompt YAML frontmatter (`tickers`, `riskPerTrade`, `strategyType`)
+2. Strategy row columns (`strategyParams`, `riskConfig`, `strategyType`)
+3. Default constants (`DEFAULT_STRATEGY_PARAMS`, `DEFAULT_RISK_CONFIG`)
+
+The daily reset key for circuit breaker is scoped per-account:
+`last_daily_reset:account:{id}`
+
+### Trigger.dev Tasks (trading-bot.ts)
+
+| Task ID               | Type      | Description                                  |
+| --------------------- | --------- | -------------------------------------------- |
+| `trading-bot`         | Scheduled | Original single-account tick (cron)          |
+| `trading-bot-multi`   | Scheduled | Multi-account tick — iterates active accounts|
+| `trading-bot-manual`  | Manual    | On-demand single tick for testing            |
+
+All tasks use `maxAttempts: 1` to prevent duplicate trades on retry.
 
 ### Key Conventions for Bot Code
 

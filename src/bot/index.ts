@@ -37,6 +37,12 @@ export {
   RiskConfigSchema,
   CircuitBreakerConfigSchema,
   BotConfigSchema,
+  // Strategy / Account schemas
+  StrategySchema,
+  InsertStrategySchema,
+  AccountSchema,
+  InsertAccountSchema,
+  StrategyPromptFrontmatterSchema,
   // Defaults
   DEFAULT_STRATEGY_PARAMS,
   DEFAULT_RISK_CONFIG,
@@ -71,6 +77,12 @@ export type {
   RiskConfig,
   CircuitBreakerConfig,
   BotConfig,
+  Strategy,
+  InsertStrategy,
+  Account,
+  InsertAccount,
+  StrategyPromptFrontmatter,
+  ParsedStrategyPrompt,
 } from "./schemas.js";
 
 // ---------------------------------------------------------------------------
@@ -109,11 +121,32 @@ export {
   // Circuit breaker state
   getCircuitBreakerState,
   setCircuitBreakerState,
+  // Strategy operations
+  insertStrategy,
+  getStrategy,
+  getStrategyByName,
+  getActiveStrategies,
+  updateStrategy,
+  deleteStrategy,
+  // Account operations
+  insertAccount,
+  getAccount,
+  getAccountByName,
+  getActiveAccounts,
+  updateAccount,
+  deleteAccount,
   // Summary
   getTickSummary,
 } from "./state.js";
 
-export type { TickRow, SignalRow, TradeRow, PositionRow } from "./state.js";
+export type {
+  TickRow,
+  SignalRow,
+  TradeRow,
+  PositionRow,
+  StrategyRow,
+  AccountRow,
+} from "./state.js";
 
 // ---------------------------------------------------------------------------
 // Strategy runner
@@ -178,9 +211,27 @@ export type { LogLevel, LogEntry, Logger } from "./logger.js";
 // Tick Orchestrator
 // ---------------------------------------------------------------------------
 
-export { executeTick } from "./tick.js";
+export {
+  executeTick,
+  executeAccountTick,
+  executeAllAccountTicks,
+} from "./tick.js";
 
-export type { ResolvedBotConfig, TickResult, TickOptions } from "./tick.js";
+export type {
+  ResolvedBotConfig,
+  TickResult,
+  TickOptions,
+  AccountTickResult,
+  MultiAccountTickResult,
+  AccountTickOptions,
+  MultiAccountTickOptions,
+} from "./tick.js";
+
+// ---------------------------------------------------------------------------
+// Strategy Prompt Parser
+// ---------------------------------------------------------------------------
+
+export { parseStrategyPrompt, parseSimpleYaml } from "./prompt-parser.js";
 
 // ---------------------------------------------------------------------------
 // Configuration
