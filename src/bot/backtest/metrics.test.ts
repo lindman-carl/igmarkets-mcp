@@ -22,8 +22,8 @@ import {
   computeDrawdownMetrics,
   computeTradeStats,
   computeMetrics,
-} from "./backtest-metrics.js";
-import type { BacktestTrade, BacktestEquityPoint } from "./backtest-schemas.js";
+} from "./metrics.js";
+import type { BacktestTrade, BacktestEquityPoint } from "./schemas.js";
 
 // ---------------------------------------------------------------------------
 // Helper builders

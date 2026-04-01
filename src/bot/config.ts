@@ -11,8 +11,8 @@
 
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { parseBotConfig } from "./schemas.js";
-import type { BotConfig } from "./schemas.js";
+import { parseBotConfig } from "./core/schemas.js";
+import type { BotConfig } from "./core/schemas.js";
 
 interface EnvConfig {
   apiKey?: string;

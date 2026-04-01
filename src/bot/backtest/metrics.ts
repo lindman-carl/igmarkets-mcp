@@ -18,7 +18,7 @@ import type {
   BacktestTrade,
   BacktestEquityPoint,
   BacktestMetrics,
-} from "./backtest-schemas.js";
+} from "./schemas.js";
 
 // ---------------------------------------------------------------------------
 // Constants

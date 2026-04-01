@@ -8,11 +8,11 @@ import {
   resetDaily,
   resetCircuitBreaker,
 } from "./circuit-breaker.js";
-import type { CircuitBreakerConfig, CircuitBreakerState } from "./schemas.js";
+import type { CircuitBreakerConfig, CircuitBreakerState } from "../core/schemas.js";
 import {
   DEFAULT_CIRCUIT_BREAKER_CONFIG,
   DEFAULT_CIRCUIT_BREAKER_STATE,
-} from "./schemas.js";
+} from "../core/schemas.js";
 
 // ---------------------------------------------------------------------------
 // Helpers

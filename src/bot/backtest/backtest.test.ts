@@ -12,15 +12,15 @@
 
 import { describe, it, expect, beforeEach } from "vitest";
 import { runBacktest, loadCandles, type BacktestCandle } from "./backtest.js";
-import { createTestDb } from "../test/create-test-db.js";
-import type { BacktestConfig } from "./backtest-schemas.js";
+import { createTestDb } from "../../test/create-test-db.js";
+import type { BacktestConfig } from "./schemas.js";
 import {
   getBacktestRun,
   getBacktestTrades,
   getBacktestEquity,
-} from "./backtest-state.js";
-import type { BotDatabase } from "../db/connection.js";
-import { upsertCandles } from "./state.js";
+} from "./state.js";
+import type { BotDatabase } from "../../db/connection.js";
+import { upsertCandles } from "../state/state.js";
 
 // ---------------------------------------------------------------------------
 // Helpers — synthetic candle generation

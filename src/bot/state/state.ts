@@ -10,7 +10,7 @@
  */
 
 import { eq, desc, and, sql, gte, lte, isNull } from "drizzle-orm";
-import type { BotDatabase } from "../db/connection.js";
+import type { BotDatabase } from "../../db/connection.js";
 import {
   ticks,
   signals,
@@ -22,7 +22,7 @@ import {
   instruments,
   accountSnapshots,
   candles,
-} from "../db/schema.js";
+} from "../../db/schema.js";
 import {
   InsertTickSchema,
   InsertSignalSchema,
@@ -49,7 +49,7 @@ import {
   type RiskState,
   type TickStatus,
   type TradeStatus,
-} from "./schemas.js";
+} from "../core/schemas.js";
 
 // ---------------------------------------------------------------------------
 // Row types inferred from Drizzle schema

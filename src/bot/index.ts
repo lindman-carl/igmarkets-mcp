@@ -5,6 +5,7 @@
  * strategy runner, position sizer, circuit breaker, executor, and logger.
  */
 
+// Core types and schemas
 export {
   TickStatusSchema,
   SignalActionSchema,
@@ -44,7 +45,7 @@ export {
   DEFAULT_CIRCUIT_BREAKER_STATE,
   DEFAULT_RISK_STATE,
   parseBotConfig,
-} from "./schemas.js";
+} from "./core/schemas.js";
 
 export type {
   TickStatus,
@@ -80,8 +81,9 @@ export type {
   InsertCandle,
   StrategyPromptFrontmatter,
   ParsedStrategyPrompt,
-} from "./schemas.js";
+} from "./core/schemas.js";
 
+// State persistence
 export {
   startTick,
   completeTick,
@@ -132,7 +134,7 @@ export {
   getCandleRange,
   pruneOldCandles,
   getTickSummary,
-} from "./state.js";
+} from "./state/state.js";
 
 export type {
   TickRow,
@@ -145,22 +147,23 @@ export type {
   AccountSnapshotRow,
   CandleRow,
   RiskStateRow,
-} from "./state.js";
+} from "./state/state.js";
 
-export { runStrategy } from "./strategy-runner.js";
+// Strategy engine
+export { runStrategy } from "./strategy/strategy-runner.js";
 
 export type {
   SentimentData,
   StrategySignal,
   StrategyContext,
-} from "./strategy-runner.js";
+} from "./strategy/strategy-runner.js";
 
 export {
   calculatePositionSize,
   calculateTrailingStop,
-} from "./position-sizer.js";
+} from "./strategy/position-sizer.js";
 
-export type { SizingInput, SizingResult } from "./position-sizer.js";
+export type { SizingInput, SizingResult } from "./strategy/position-sizer.js";
 
 export {
   checkCircuitBreaker,
@@ -170,21 +173,23 @@ export {
   recordSuccess,
   resetDaily,
   resetCircuitBreaker,
-} from "./circuit-breaker.js";
+} from "./strategy/circuit-breaker.js";
 
-export type { CircuitBreakerCheck } from "./circuit-breaker.js";
+export type { CircuitBreakerCheck } from "./strategy/circuit-breaker.js";
 
-export { executeOpenTrade, executeCloseTrade } from "./executor.js";
+// Execution
+export { executeOpenTrade, executeCloseTrade } from "./execution/executor.js";
 
 export type {
   ExecuteTradeParams,
   ExecuteTradeResult,
   ClosePositionParams,
-} from "./executor.js";
+} from "./execution/executor.js";
 
-export { createLogger, LOG_CATEGORIES } from "./logger.js";
+// Core utilities
+export { createLogger, LOG_CATEGORIES } from "./core/logger.js";
 
-export type { LogLevel, LogEntry, Logger } from "./logger.js";
+export type { LogLevel, LogEntry, Logger } from "./core/logger.js";
 
 export {
   executeTick,
@@ -202,7 +207,7 @@ export type {
   MultiAccountTickOptions,
 } from "./tick.js";
 
-export { parseStrategyPrompt, parseSimpleYaml } from "./prompt-parser.js";
+export { parseStrategyPrompt, parseSimpleYaml } from "./core/prompt-parser.js";
 
 export { loadBotConfig, buildCronExpression } from "./config.js";
 
@@ -219,7 +224,7 @@ export {
   InsertBacktestRunSchema,
   InsertBacktestTradeSchema,
   InsertBacktestEquitySchema,
-} from "./backtest-schemas.js";
+} from "./backtest/schemas.js";
 
 export type {
   BacktestConfig,
@@ -231,7 +236,7 @@ export type {
   InsertBacktestTrade,
   InsertBacktestEquity,
   BacktestSentimentData,
-} from "./backtest-schemas.js";
+} from "./backtest/schemas.js";
 
 export {
   insertBacktestRun,
@@ -242,16 +247,16 @@ export {
   getBacktestTrades,
   insertBacktestEquity,
   getBacktestEquity,
-} from "./backtest-state.js";
+} from "./backtest/state.js";
 
 export type {
   BacktestRunRow,
   BacktestTradeRow,
   BacktestEquityRow,
-} from "./backtest-state.js";
+} from "./backtest/state.js";
 
-export { VirtualPortfolio } from "./backtest-portfolio.js";
-export type { VirtualPosition, BarInfo } from "./backtest-portfolio.js";
+export { VirtualPortfolio } from "./backtest/portfolio.js";
+export type { VirtualPosition, BarInfo } from "./backtest/portfolio.js";
 
 export {
   computeMetrics,
@@ -262,7 +267,7 @@ export {
   computeTradeStats,
   arrayMean,
   arrayStd,
-} from "./backtest-metrics.js";
+} from "./backtest/metrics.js";
 
-export { runBacktest, loadCandles } from "./backtest.js";
-export type { BacktestCandle } from "./backtest.js";
+export { runBacktest, loadCandles } from "./backtest/backtest.js";
+export type { BacktestCandle } from "./backtest/backtest.js";

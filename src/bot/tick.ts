@@ -28,13 +28,13 @@ import type { BotDatabase } from "../db/connection.js";
 import { createDatabase } from "../db/connection.js";
 import { runMigrations } from "../db/migrate.js";
 import type { Candle } from "../lib/indicators.js";
-import { runStrategy } from "./strategy-runner.js";
-import type { SentimentData, StrategySignal } from "./strategy-runner.js";
+import { runStrategy } from "./strategy/strategy-runner.js";
+import type { SentimentData, StrategySignal } from "./strategy/strategy-runner.js";
 import {
   calculatePositionSize,
   calculateTrailingStop,
-} from "./position-sizer.js";
-import { executeOpenTrade, executeCloseTrade } from "./executor.js";
+} from "./strategy/position-sizer.js";
+import { executeOpenTrade, executeCloseTrade } from "./execution/executor.js";
 import {
   checkCircuitBreaker,
   recordWin,
@@ -42,9 +42,9 @@ import {
   recordError,
   recordSuccess,
   resetDaily,
-} from "./circuit-breaker.js";
-import { createLogger, LOG_CATEGORIES } from "./logger.js";
-import type { Logger } from "./logger.js";
+} from "./strategy/circuit-breaker.js";
+import { createLogger, LOG_CATEGORIES } from "./core/logger.js";
+import type { Logger } from "./core/logger.js";
 import {
   startTick,
   completeTick,
@@ -59,21 +59,21 @@ import {
   updatePositionLevels,
   getActiveAccounts,
   getStrategy,
-} from "./state.js";
-import type { PositionRow, AccountRow, StrategyRow } from "./state.js";
+} from "./state/state.js";
+import type { PositionRow, AccountRow, StrategyRow } from "./state/state.js";
 import type {
   BotConfig,
   WatchlistItem,
   CircuitBreakerState,
   StrategyName,
-} from "./schemas.js";
+} from "./core/schemas.js";
 import {
   parseBotConfig,
   StrategyNameSchema,
   DEFAULT_STRATEGY_PARAMS,
   DEFAULT_RISK_CONFIG,
-} from "./schemas.js";
-import { parseStrategyPrompt } from "./prompt-parser.js";
+} from "./core/schemas.js";
+import { parseStrategyPrompt } from "./core/prompt-parser.js";
 
 // ---------------------------------------------------------------------------
 // Types

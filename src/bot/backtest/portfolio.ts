@@ -14,9 +14,9 @@
  * entry and exit, plus additional slippage.
  */
 
-import type { BacktestEquityPoint, BacktestTrade } from "./backtest-schemas.js";
-import type { StrategySignal } from "./strategy-runner.js";
-import type { SizingResult } from "./position-sizer.js";
+import type { BacktestEquityPoint, BacktestTrade } from "./schemas.js";
+import type { StrategySignal } from "../strategy/strategy-runner.js";
+import type { SizingResult } from "../strategy/position-sizer.js";
 
 // ---------------------------------------------------------------------------
 // Types

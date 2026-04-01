@@ -25,40 +25,40 @@
  */
 
 import { and, eq, gte, lte, asc } from "drizzle-orm";
-import { candles as candlesTable } from "../db/schema.js";
-import type { Candle } from "../lib/indicators.js";
-import { calculateIndicators } from "../lib/indicators.js";
-import { runStrategy } from "./strategy-runner.js";
+import { candles as candlesTable } from "../../db/schema.js";
+import type { Candle } from "../../lib/indicators.js";
+import { calculateIndicators } from "../../lib/indicators.js";
+import { runStrategy } from "../strategy/strategy-runner.js";
 import {
   calculatePositionSize,
   calculateTrailingStop,
-} from "./position-sizer.js";
+} from "../strategy/position-sizer.js";
 import {
   checkCircuitBreaker,
   recordWin,
   recordLoss,
-} from "./circuit-breaker.js";
-import { VirtualPortfolio } from "./backtest-portfolio.js";
-import { computeMetrics } from "./backtest-metrics.js";
+} from "../strategy/circuit-breaker.js";
+import { VirtualPortfolio } from "./portfolio.js";
+import { computeMetrics } from "./metrics.js";
 import {
   insertBacktestRun,
   updateBacktestRun,
   insertBacktestTrades,
   insertBacktestEquity,
-} from "./backtest-state.js";
+} from "./state.js";
 import type {
   BacktestConfig,
   BacktestResult,
   BacktestTrade,
-} from "./backtest-schemas.js";
-import type { BotDatabase } from "../db/connection.js";
-import type { CircuitBreakerState, StrategyParams } from "./schemas.js";
+} from "./schemas.js";
+import type { BotDatabase } from "../../db/connection.js";
+import type { CircuitBreakerState, StrategyParams } from "../core/schemas.js";
 import {
   DEFAULT_STRATEGY_PARAMS,
   DEFAULT_RISK_CONFIG,
   DEFAULT_CIRCUIT_BREAKER_CONFIG,
   DEFAULT_CIRCUIT_BREAKER_STATE,
-} from "./schemas.js";
+} from "../core/schemas.js";
 
 // ---------------------------------------------------------------------------
 // Candle loading

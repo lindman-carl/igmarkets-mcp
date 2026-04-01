@@ -4,8 +4,8 @@ import {
   calculateTrailingStop,
   type SizingInput,
 } from "./position-sizer.js";
-import type { RiskConfig } from "./schemas.js";
-import { DEFAULT_RISK_CONFIG } from "./schemas.js";
+import type { RiskConfig } from "../core/schemas.js";
+import { DEFAULT_RISK_CONFIG } from "../core/schemas.js";
 
 // ---------------------------------------------------------------------------
 // Helpers

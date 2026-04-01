@@ -24,10 +24,10 @@
  */
 
 import { task, logger as triggerLogger } from "@trigger.dev/sdk/v3";
-import { runBacktest } from "../bot/backtest.js";
+import { runBacktest } from "../bot/backtest/backtest.js";
 import { createDatabase } from "../db/connection.js";
 import { runMigrations } from "../db/migrate.js";
-import type { BacktestConfig } from "../bot/backtest-schemas.js";
+import type { BacktestConfig } from "../bot/backtest/schemas.js";
 
 // ---------------------------------------------------------------------------
 // Payload type (plain JSON from Trigger.dev dashboard)

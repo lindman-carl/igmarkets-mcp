@@ -6,19 +6,19 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { createTestDb } from "../test/create-test-db.js";
-import type { BotDatabase } from "../db/connection.js";
+import { createTestDb } from "../../test/create-test-db.js";
+import type { BotDatabase } from "../../db/connection.js";
 import { executeOpenTrade, executeCloseTrade } from "./executor.js";
-import type { StrategySignal } from "./strategy-runner.js";
-import type { SizingResult } from "./position-sizer.js";
-import type { WatchlistItem } from "./schemas.js";
+import type { StrategySignal } from "../strategy/strategy-runner.js";
+import type { SizingResult } from "../strategy/position-sizer.js";
+import type { WatchlistItem } from "../core/schemas.js";
 import {
   getPositionByDealId,
   getTradesByTick,
   startTick,
   insertPosition,
-} from "./state.js";
-import type { IGClient } from "../ig-client.js";
+} from "../state/state.js";
+import type { IGClient } from "../../ig-client.js";
 
 // ---------------------------------------------------------------------------
 // Fixtures

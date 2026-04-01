@@ -13,18 +13,18 @@
  * - Deal confirmation verification
  */
 
-import type { IGClient } from "../ig-client.js";
-import type { BotDatabase } from "../db/connection.js";
-import type { StrategySignal } from "./strategy-runner.js";
-import type { SizingResult } from "./position-sizer.js";
-import type { RiskConfig, WatchlistItem } from "./schemas.js";
+import type { IGClient } from "../../ig-client.js";
+import type { BotDatabase } from "../../db/connection.js";
+import type { StrategySignal } from "../strategy/strategy-runner.js";
+import type { SizingResult } from "../strategy/position-sizer.js";
+import type { RiskConfig, WatchlistItem } from "../core/schemas.js";
 import {
   insertTrade,
   updateTradeConfirmation,
   insertPosition,
   closeTrackedPosition,
   getPositionByDealId,
-} from "./state.js";
+} from "../state/state.js";
 
 // ---------------------------------------------------------------------------
 // Types

@@ -12,10 +12,10 @@
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { VirtualPortfolio } from "./backtest-portfolio.js";
-import type { BarInfo } from "./backtest-portfolio.js";
-import type { StrategySignal } from "./strategy-runner.js";
-import type { SizingResult } from "./position-sizer.js";
+import { VirtualPortfolio } from "./portfolio.js";
+import type { BarInfo } from "./portfolio.js";
+import type { StrategySignal } from "../strategy/strategy-runner.js";
+import type { SizingResult } from "../strategy/position-sizer.js";
 
 // ---------------------------------------------------------------------------
 // Fixtures

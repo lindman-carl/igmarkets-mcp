@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { runStrategy } from "./strategy-runner.js";
-import type { Candle } from "../lib/indicators.js";
-import type { StrategyParams } from "./schemas.js";
-import { DEFAULT_STRATEGY_PARAMS } from "./schemas.js";
+import type { Candle } from "../../lib/indicators.js";
+import type { StrategyParams } from "../core/schemas.js";
+import { DEFAULT_STRATEGY_PARAMS } from "../core/schemas.js";
 
 // ---------------------------------------------------------------------------
 // Helpers

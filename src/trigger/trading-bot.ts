@@ -32,7 +32,7 @@
 import { schedules, logger as triggerLogger, task } from "@trigger.dev/sdk/v3";
 import { executeTick, executeAllAccountTicks } from "../bot/tick.js";
 import { loadBotConfig, buildCronExpression } from "../bot/config.js";
-import { createLogger, LOG_CATEGORIES } from "../bot/logger.js";
+import { createLogger, LOG_CATEGORIES } from "../bot/core/logger.js";
 import { createDatabase } from "../db/connection.js";
 import { runMigrations } from "../db/migrate.js";
 

@@ -11,12 +11,8 @@
  */
 
 import { eq, desc } from "drizzle-orm";
-import type { BotDatabase } from "../db/connection.js";
-import {
-  backtestRuns,
-  backtestTrades,
-  backtestEquity,
-} from "./backtest-tables.js";
+import type { BotDatabase } from "../../db/connection.js";
+import { backtestRuns, backtestTrades, backtestEquity } from "./tables.js";
 import {
   InsertBacktestRunSchema,
   InsertBacktestTradeSchema,
@@ -24,7 +20,7 @@ import {
   type InsertBacktestRun,
   type InsertBacktestTrade,
   type InsertBacktestEquity,
-} from "./backtest-schemas.js";
+} from "./schemas.js";
 
 // ---------------------------------------------------------------------------
 // Row types (inferred from Drizzle)

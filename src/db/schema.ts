@@ -18,7 +18,7 @@ import { pgTable, index, uniqueIndex, unique } from "drizzle-orm/pg-core";
 import * as t from "drizzle-orm/pg-core";
 
 // ---------------------------------------------------------------------------
-// Backtest tables — defined in src/bot/backtest-tables.ts
+// Backtest tables — defined in src/bot/backtest/tables.ts
 // Re-exported here so that the Drizzle schema object used in createDatabase()
 // and createTestDb() picks them up automatically.
 // ---------------------------------------------------------------------------
@@ -27,7 +27,7 @@ export {
   backtestRuns,
   backtestTrades,
   backtestEquity,
-} from "../bot/backtest-tables.js";
+} from "../bot/backtest/tables.js";
 
 // ---------------------------------------------------------------------------
 // Strategies — named strategy configurations with markdown prompts

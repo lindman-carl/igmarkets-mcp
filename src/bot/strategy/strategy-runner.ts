@@ -14,16 +14,16 @@
  * All strategies are pure functions: (candles, indicators, sentiment, params) → Signal[]
  */
 
-import type { Candle, IndicatorSnapshot } from "../lib/indicators.js";
-import { calculateIndicators, determineTrend } from "../lib/indicators.js";
+import type { Candle, IndicatorSnapshot } from "../../lib/indicators.js";
+import { calculateIndicators, determineTrend } from "../../lib/indicators.js";
 import type {
   StrategyName,
   StrategyParams,
   SignalAction,
   SignalType,
   IndicatorData,
-} from "./schemas.js";
-import { DEFAULT_STRATEGY_PARAMS } from "./schemas.js";
+} from "../core/schemas.js";
+import { DEFAULT_STRATEGY_PARAMS } from "../core/schemas.js";
 
 // ---------------------------------------------------------------------------
 // Types

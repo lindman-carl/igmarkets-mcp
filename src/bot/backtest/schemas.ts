@@ -16,7 +16,7 @@ import {
   StrategyParamsSchema,
   RiskConfigSchema,
   CircuitBreakerConfigSchema,
-} from "./schemas.js";
+} from "../core/schemas.js";
 
 // ---------------------------------------------------------------------------
 // Sentiment map (epic → { longPositionPercentage, shortPositionPercentage })

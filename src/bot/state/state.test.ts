@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { createTestDb } from "../test/create-test-db.js";
-import type { BotDatabase } from "../db/connection.js";
+import { createTestDb } from "../../test/create-test-db.js";
+import type { BotDatabase } from "../../db/connection.js";
 import {
   startTick,
   completeTick,
@@ -54,7 +54,7 @@ import {
 import {
   DEFAULT_CIRCUIT_BREAKER_STATE,
   DEFAULT_RISK_STATE,
-} from "./schemas.js";
+} from "../core/schemas.js";
 
 // ---------------------------------------------------------------------------
 // Fixtures
