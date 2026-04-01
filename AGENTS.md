@@ -233,14 +233,15 @@ If the session expires, call `ig_refresh_token` (v3) or re-login.
 The plugin includes specialized skills for higher-level trading workflows. These
 provide opinionated, step-by-step guidance beyond the basic tool reference.
 
-| Skill                  | Directory                      | Use When                                                           |
-| ---------------------- | ------------------------------ | ------------------------------------------------------------------ |
-| `igmarkets`            | `skills/igmarkets/`            | General tool reference and basic workflows                         |
-| `portfolio-management` | `skills/portfolio-management/` | Portfolio review, P&L analysis, exposure, rebalancing              |
-| `cfd-trading`          | `skills/cfd-trading/`          | Opening/closing CFDs, margin, leverage, DFB, spread bets           |
-| `market-analysis`      | `skills/market-analysis/`      | Price analysis, sentiment, multi-timeframe review, screening       |
-| `risk-management`      | `skills/risk-management/`      | Position sizing, stop strategies, risk/reward, portfolio risk      |
-| `trading-strategies`   | `skills/trading-strategies/`   | Systematic strategies: trend, breakout, mean-reversion, contrarian |
+| Skill                  | Directory                      | Use When                                                             |
+| ---------------------- | ------------------------------ | -------------------------------------------------------------------- |
+| `igmarkets`            | `skills/igmarkets/`            | General tool reference and basic workflows                           |
+| `portfolio-management` | `skills/portfolio-management/` | Portfolio review, P&L analysis, exposure, rebalancing                |
+| `cfd-trading`          | `skills/cfd-trading/`          | Opening/closing CFDs, margin, leverage, DFB, spread bets             |
+| `market-analysis`      | `skills/market-analysis/`      | Price analysis, sentiment, multi-timeframe review, screening         |
+| `risk-management`      | `skills/risk-management/`      | Position sizing, stop strategies, risk/reward, portfolio risk        |
+| `trading-strategies`   | `skills/trading-strategies/`   | Systematic strategies: trend, breakout, mean-reversion, contrarian   |
+| `trading-bot`          | `skills/trading-bot/`          | Automated bot setup, config, deployment, monitoring, troubleshooting |
 
 Skills are composable. For example, a typical trade flow uses:
 
@@ -249,6 +250,9 @@ Skills are composable. For example, a typical trade flow uses:
 3. **risk-management** to size the position and set stops
 4. **cfd-trading** to execute the trade
 5. **portfolio-management** to monitor the overall portfolio
+
+For automated trading, use the **trading-bot** skill which combines strategies,
+risk management, and execution into a scheduled pipeline.
 
 ## Key IG Concepts
 
@@ -259,3 +263,44 @@ Skills are composable. For example, a typical trade flow uses:
 - **OTC**: Over-the-counter - the market type for CFDs and spread bets
 - **Spread**: Difference between bid and offer price (this is IG's commission)
 - **Guaranteed Stop**: A stop that is guaranteed to execute at the set level (extra charge)
+
+## Automated Trading Bot
+
+The plugin includes an automated trading bot that runs on a cron schedule via
+Trigger.dev. See the `trading-bot` skill (`skills/trading-bot/SKILL.md`) for
+full documentation.
+
+### Quick Reference
+
+- **Config file**: `bot-config.json` in project root
+- **Trigger.dev config**: `trigger.config.ts`
+- **Scheduled task**: `trading-bot` (cron, every 15min during market hours)
+- **Manual task**: `trading-bot-manual` (on-demand testing)
+- **Database**: SQLite via Drizzle ORM (`bot.db`)
+- **Strategies**: `trend-following`, `breakout`, `mean-reversion`, `sentiment-contrarian`
+
+### Bot Source Files
+
+| File                         | Purpose                             |
+| ---------------------------- | ----------------------------------- |
+| `src/trigger/trading-bot.ts` | Trigger.dev task definitions        |
+| `src/bot/tick.ts`            | Main tick orchestrator              |
+| `src/bot/config.ts`          | Config loader (file + env)          |
+| `src/bot/schemas.ts`         | Zod v4 schemas and types            |
+| `src/bot/strategy-runner.ts` | 4 strategy implementations          |
+| `src/bot/position-sizer.ts`  | Risk-based position sizing          |
+| `src/bot/executor.ts`        | Trade execution + confirmation      |
+| `src/bot/circuit-breaker.ts` | Safety circuit breaker              |
+| `src/bot/state.ts`           | SQLite persistence CRUD             |
+| `src/bot/logger.ts`          | Structured trade journal            |
+| `src/lib/indicators.ts`      | Technical indicators (SMA, ATR, BB) |
+| `src/db/schema.ts`           | Drizzle ORM table definitions       |
+
+### Key Conventions for Bot Code
+
+- The bot uses **its own `IGClient` instance** — not the plugin's `getClient()` singleton
+- **Zod v4** schemas — import from `"zod/v4"`
+- **Drizzle ORM** with `better-sqlite3` for state persistence
+- **No retries** on Trigger.dev tasks (`maxAttempts: 1`) to prevent duplicate trades
+- **Demo mode by default** (`isDemo: true`)
+- All `.ts` files use **`.js` extension imports** (Node16 module resolution)

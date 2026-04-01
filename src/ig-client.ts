@@ -4,6 +4,10 @@
  * Handles authentication (v3 OAuth + v2 CST/token), session management,
  * automatic token refresh, and versioned API requests.
  *
+ * Usage:
+ *   - **Plugin tools**: Use the singleton via `getClient()` / `initClient()`
+ *   - **Bot / standalone**: Instantiate directly with `new IGClient(config)`
+ *
  * IG API base URLs:
  *   Live: https://api.ig.com/gateway/deal
  *   Demo: https://demo-api.ig.com/gateway/deal
@@ -270,6 +274,20 @@ export class IGClient {
 
   getSessionInfo(): SessionState {
     return { ...this.session };
+  }
+
+  /**
+   * Manually set the account ID (e.g. after switching accounts).
+   */
+  setAccountId(accountId: string): void {
+    this.session.accountId = accountId;
+  }
+
+  /**
+   * Get the base URL for this client instance.
+   */
+  getBaseUrl(): string {
+    return this.baseUrl;
   }
 }
 

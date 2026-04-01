@@ -40,16 +40,26 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "db:generate": "drizzle-kit generate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "db:migrate": "tsx src/db/migrate.ts"
   },
   "dependencies": {
-    "@sinclair/typebox": "^0.34.0"
+    "@sinclair/typebox": "^0.34.0",
+    "@trigger.dev/sdk": "^4.4.3",
+    "better-sqlite3": "^12.8.0",
+    "drizzle-orm": "^0.45.2",
+    "zod": "^3.25.76"
   },
   "peerDependencies": {
     "openclaw": ">=2026.3.24-beta.2"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "25.5.0",
+    "drizzle-kit": "^0.31.10",
     "prettier": "3.8.1",
     "tsx": "4.21.0",
     "typescript": "6.0.2"
