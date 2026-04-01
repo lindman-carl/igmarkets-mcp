@@ -28,6 +28,7 @@ const TRADE_TOOLS = new Set([
   "ig_create_position",
   "ig_close_position",
   "ig_create_working_order",
+  "ig_update_working_order",
   "ig_delete_working_order",
 ]);
 

@@ -64,6 +64,7 @@ executing trade-mutating tools:
 - `ig_create_position`
 - `ig_close_position`
 - `ig_create_working_order`
+- `ig_update_working_order`
 - `ig_delete_working_order`
 
 This is enabled by default. To disable, set `tradeApproval: false` in the plugin
@@ -400,24 +401,6 @@ Config resolution order (highest priority first):
 
 The daily reset key for circuit breaker is scoped per-account:
 `last_daily_reset:account:{id}`
-
-### Bot Source Files
-
-| File                         | Purpose                             |
-| ---------------------------- | ----------------------------------- |
-| `src/trigger/trading-bot.ts` | Trigger.dev task definitions        |
-| `src/bot/tick.ts`            | Main tick orchestrator              |
-| `src/bot/config.ts`          | Config loader (file + env)          |
-| `src/bot/schemas.ts`         | Zod v4 schemas and types            |
-| `src/bot/strategy-runner.ts` | 4 strategy implementations          |
-| `src/bot/position-sizer.ts`  | Risk-based position sizing          |
-| `src/bot/executor.ts`        | Trade execution + confirmation      |
-| `src/bot/circuit-breaker.ts` | Safety circuit breaker              |
-| `src/bot/state.ts`           | PostgreSQL persistence CRUD         |
-| `src/bot/prompt-parser.ts`   | Strategy prompt parser (YAML + MD)  |
-| `src/bot/logger.ts`          | Structured trade journal            |
-| `src/lib/indicators.ts`      | Technical indicators (SMA, ATR, BB) |
-| `src/db/schema.ts`           | Drizzle ORM table definitions       |
 
 ### Trigger.dev Tasks (trading-bot.ts)
 
