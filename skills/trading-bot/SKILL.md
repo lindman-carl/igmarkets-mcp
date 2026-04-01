@@ -395,9 +395,108 @@ Used for circuit breaker state, daily counters, and other persistent bot state.
   indicators are not available
 - **Single strategy per deployment** — the bot runs one strategy across all
   watchlist instruments; multi-strategy requires multiple deployments
-- **No backtesting** — strategies have not been validated against historical data;
-  always test on demo first
 - **Rate limits** — IG allows ~60 requests/minute; with 5+ instruments on a
   5-minute interval, you may approach limits
 - **No built-in notifications** — the bot logs results but does not send alerts;
   use Trigger.dev dashboard for monitoring
+
+---
+
+## Backtesting
+
+The plugin includes a full backtesting engine that replays historical candles
+through the same strategy, position sizing, and circuit breaker logic used live.
+
+### Trigger.dev Task
+
+| Task ID    | Type   | Description                                      |
+| ---------- | ------ | ------------------------------------------------ |
+| `backtest` | Manual | Run a backtest for a given strategy + date range |
+
+**Example payload:**
+
+```json
+{
+  "strategyName": "trend-following",
+  "instruments": [
+    { "epic": "IX.D.FTSE.DAILY.IP", "expiry": "DFB", "currencyCode": "GBP" }
+  ],
+  "startingCapital": 10000,
+  "dateRange": { "from": "2024-01-01", "to": "2024-12-31" },
+  "resolution": "DAY",
+  "spreadPips": 1,
+  "slippagePips": 0.5
+}
+```
+
+### Source Files
+
+| File                            | Purpose                                                        |
+| ------------------------------- | -------------------------------------------------------------- |
+| `src/bot/backtest.ts`           | Main engine — `runBacktest()`, `loadCandles()`                 |
+| `src/bot/backtest-portfolio.ts` | `VirtualPortfolio` — simulated fill & P&L tracking             |
+| `src/bot/backtest-metrics.ts`   | Pure math metrics (Sharpe, Sortino, drawdown, etc.)            |
+| `src/bot/backtest-schemas.ts`   | Zod v4 schemas and TypeScript types                            |
+| `src/bot/backtest-state.ts`     | CRUD for `backtest_runs`, `backtest_trades`, `backtest_equity` |
+| `src/bot/backtest-tables.ts`    | Drizzle pgTable definitions (3 new tables)                     |
+| `src/trigger/backtest.ts`       | Trigger.dev task definition                                    |
+
+### Database Tables
+
+| Table             | Purpose                             |
+| ----------------- | ----------------------------------- |
+| `backtest_runs`   | One row per backtest execution      |
+| `backtest_trades` | All simulated closed trades per run |
+| `backtest_equity` | Bar-by-bar equity curve per run     |
+
+### Fill Model
+
+| Action     | Fill price                    |
+| ---------- | ----------------------------- |
+| BUY entry  | bar close + spread + slippage |
+| SELL entry | bar close − spread − slippage |
+| BUY exit   | bar close − spread − slippage |
+| SELL exit  | bar close + spread + slippage |
+
+### Metrics Produced
+
+| Metric                    | Description                                  |
+| ------------------------- | -------------------------------------------- |
+| `totalReturn`             | Total P&L in account currency                |
+| `totalReturnPct`          | Total return as % of starting capital        |
+| `annualizedReturnPct`     | CAGR using bars processed / 252              |
+| `sharpeRatio`             | Annualised Sharpe (risk-free rate = 0)       |
+| `sortinoRatio`            | Annualised Sortino (penalises downside only) |
+| `maxDrawdownPct`          | Worst peak-to-trough drawdown (fraction)     |
+| `maxDrawdownAmount`       | Worst peak-to-trough drawdown (currency)     |
+| `maxDrawdownDurationBars` | Longest consecutive drawdown streak          |
+| `winRate`                 | Winning trades / total trades                |
+| `profitFactor`            | Gross profit / gross loss                    |
+| `avgWin` / `avgLoss`      | Average P&L per winning / losing trade       |
+| `avgBarsHeld`             | Average bars held per trade                  |
+
+### API Usage (from code)
+
+```typescript
+import { runBacktest } from "./bot/backtest.js";
+import type { BacktestConfig } from "./bot/backtest-schemas.js";
+
+const config: BacktestConfig = {
+  strategyName: "trend-following",
+  instruments: [
+    { epic: "IX.D.FTSE.DAILY.IP", expiry: "DFB", currencyCode: "GBP" },
+  ],
+  startingCapital: 10_000,
+  dateRange: { from: new Date("2024-01-01"), to: new Date("2024-12-31") },
+  resolution: "DAY",
+  spreadPips: 1,
+  slippagePips: 0.5,
+};
+
+// Pass pre-loaded candles OR a db connection (or both)
+const result = await runBacktest(config, candleMap, db);
+
+console.log(result.metrics.totalReturnPct); // e.g. 0.124 = 12.4%
+console.log(result.metrics.sharpeRatio);
+console.log(result.trades.length);
+```

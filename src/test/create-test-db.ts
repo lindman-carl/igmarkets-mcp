@@ -202,6 +202,74 @@ CREATE TABLE IF NOT EXISTS risk_state (
   updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS risk_state_account_id_idx ON risk_state (account_id);
+
+-- backtest_runs
+CREATE TABLE IF NOT EXISTS backtest_runs (
+  id               SERIAL PRIMARY KEY,
+  strategy_name    TEXT NOT NULL,
+  instruments      JSONB NOT NULL,
+  starting_capital DOUBLE PRECISION NOT NULL,
+  date_from        TIMESTAMPTZ NOT NULL,
+  date_to          TIMESTAMPTZ NOT NULL,
+  resolution       TEXT NOT NULL DEFAULT 'DAY',
+  strategy_params  JSONB,
+  risk_config      JSONB,
+  spread_pips      DOUBLE PRECISION NOT NULL DEFAULT 1,
+  slippage_pips    DOUBLE PRECISION NOT NULL DEFAULT 0.5,
+  status           TEXT NOT NULL DEFAULT 'running',
+  metrics          JSONB,
+  warnings         JSONB,
+  total_trades     INTEGER,
+  total_bars       INTEGER,
+  duration_ms      INTEGER,
+  started_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at     TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS backtest_runs_strategy_name_idx ON backtest_runs (strategy_name);
+CREATE INDEX IF NOT EXISTS backtest_runs_started_at_idx ON backtest_runs (started_at);
+CREATE INDEX IF NOT EXISTS backtest_runs_status_idx ON backtest_runs (status);
+
+-- backtest_trades
+CREATE TABLE IF NOT EXISTS backtest_trades (
+  id                 SERIAL PRIMARY KEY,
+  run_id             INTEGER NOT NULL,
+  epic               TEXT NOT NULL,
+  strategy           TEXT NOT NULL,
+  direction          TEXT NOT NULL,
+  size               DOUBLE PRECISION NOT NULL,
+  entry_price        DOUBLE PRECISION NOT NULL,
+  exit_price         DOUBLE PRECISION NOT NULL,
+  entry_bar          INTEGER NOT NULL,
+  exit_bar           INTEGER NOT NULL,
+  bars_held          INTEGER NOT NULL,
+  pnl                DOUBLE PRECISION NOT NULL,
+  pnl_pct            DOUBLE PRECISION NOT NULL,
+  stop_level         DOUBLE PRECISION,
+  limit_level        DOUBLE PRECISION,
+  entry_signal_data  JSONB,
+  exit_reason        TEXT NOT NULL,
+  entry_timestamp    TIMESTAMPTZ,
+  exit_timestamp     TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS backtest_trades_run_id_idx ON backtest_trades (run_id);
+CREATE INDEX IF NOT EXISTS backtest_trades_epic_idx ON backtest_trades (epic);
+CREATE INDEX IF NOT EXISTS backtest_trades_strategy_idx ON backtest_trades (strategy);
+
+-- backtest_equity
+CREATE TABLE IF NOT EXISTS backtest_equity (
+  id                  SERIAL PRIMARY KEY,
+  run_id              INTEGER NOT NULL,
+  bar_index           INTEGER NOT NULL,
+  timestamp           TIMESTAMPTZ,
+  equity              DOUBLE PRECISION NOT NULL,
+  cash                DOUBLE PRECISION NOT NULL,
+  unrealized_pnl      DOUBLE PRECISION NOT NULL DEFAULT 0,
+  drawdown_pct        DOUBLE PRECISION NOT NULL DEFAULT 0,
+  drawdown_amount     DOUBLE PRECISION NOT NULL DEFAULT 0,
+  open_position_count INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS backtest_equity_run_id_idx ON backtest_equity (run_id);
+CREATE INDEX IF NOT EXISTS backtest_equity_bar_index_idx ON backtest_equity (bar_index);
 `;
 
 /**

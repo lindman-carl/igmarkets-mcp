@@ -205,3 +205,64 @@ export type {
 export { parseStrategyPrompt, parseSimpleYaml } from "./prompt-parser.js";
 
 export { loadBotConfig, buildCronExpression } from "./config.js";
+
+// ---------------------------------------------------------------------------
+// Backtest Engine
+// ---------------------------------------------------------------------------
+
+export {
+  BacktestConfigSchema,
+  BacktestTradeSchema,
+  BacktestEquityPointSchema,
+  BacktestMetricsSchema,
+  BacktestResultSchema,
+  InsertBacktestRunSchema,
+  InsertBacktestTradeSchema,
+  InsertBacktestEquitySchema,
+} from "./backtest-schemas.js";
+
+export type {
+  BacktestConfig,
+  BacktestTrade,
+  BacktestEquityPoint,
+  BacktestMetrics,
+  BacktestResult,
+  InsertBacktestRun,
+  InsertBacktestTrade,
+  InsertBacktestEquity,
+  BacktestSentimentData,
+} from "./backtest-schemas.js";
+
+export {
+  insertBacktestRun,
+  updateBacktestRun,
+  getBacktestRun,
+  getRecentBacktestRuns,
+  insertBacktestTrades,
+  getBacktestTrades,
+  insertBacktestEquity,
+  getBacktestEquity,
+} from "./backtest-state.js";
+
+export type {
+  BacktestRunRow,
+  BacktestTradeRow,
+  BacktestEquityRow,
+} from "./backtest-state.js";
+
+export { VirtualPortfolio } from "./backtest-portfolio.js";
+export type { VirtualPosition, BarInfo } from "./backtest-portfolio.js";
+
+export {
+  computeMetrics,
+  computeDailyReturns,
+  computeSharpe,
+  computeSortino,
+  computeDrawdownMetrics,
+  computeTradeStats,
+  arrayMean,
+  arrayStd,
+} from "./backtest-metrics.js";
+
+export { runBacktest, loadCandles } from "./backtest.js";
+export type { BacktestCandle } from "./backtest.js";

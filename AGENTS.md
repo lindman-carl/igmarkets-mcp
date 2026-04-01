@@ -283,36 +283,46 @@ full documentation.
 
 ### Bot Source Files
 
-| File                         | Purpose                             |
-| ---------------------------- | ----------------------------------- |
-| `src/trigger/trading-bot.ts` | Trigger.dev task definitions        |
-| `src/bot/tick.ts`            | Main tick orchestrator              |
-| `src/bot/config.ts`          | Config loader (file + env)          |
-| `src/bot/schemas.ts`         | Zod v4 schemas and types            |
-| `src/bot/strategy-runner.ts` | 4 strategy implementations          |
-| `src/bot/position-sizer.ts`  | Risk-based position sizing          |
-| `src/bot/executor.ts`        | Trade execution + confirmation      |
-| `src/bot/circuit-breaker.ts` | Safety circuit breaker              |
-| `src/bot/state.ts`           | PostgreSQL persistence CRUD         |
-| `src/bot/prompt-parser.ts`   | Strategy prompt parser (YAML + MD)  |
-| `src/bot/logger.ts`          | Structured trade journal            |
-| `src/lib/indicators.ts`      | Technical indicators (SMA, ATR, BB) |
-| `src/db/schema.ts`           | Drizzle ORM table definitions       |
+| File                            | Purpose                                         |
+| ------------------------------- | ----------------------------------------------- |
+| `src/trigger/trading-bot.ts`    | Trigger.dev task definitions                    |
+| `src/trigger/backtest.ts`       | Trigger.dev manual task for on-demand backtests |
+| `src/bot/tick.ts`               | Main tick orchestrator                          |
+| `src/bot/config.ts`             | Config loader (file + env)                      |
+| `src/bot/schemas.ts`            | Zod v4 schemas and types                        |
+| `src/bot/strategy-runner.ts`    | 4 strategy implementations                      |
+| `src/bot/position-sizer.ts`     | Risk-based position sizing                      |
+| `src/bot/executor.ts`           | Trade execution + confirmation                  |
+| `src/bot/circuit-breaker.ts`    | Safety circuit breaker                          |
+| `src/bot/state.ts`              | PostgreSQL persistence CRUD                     |
+| `src/bot/prompt-parser.ts`      | Strategy prompt parser (YAML + MD)              |
+| `src/bot/logger.ts`             | Structured trade journal                        |
+| `src/lib/indicators.ts`         | Technical indicators (SMA, ATR, BB)             |
+| `src/db/schema.ts`              | Drizzle ORM table definitions                   |
+| `src/bot/backtest-schemas.ts`   | Zod v4 schemas for backtest config & results    |
+| `src/bot/backtest-tables.ts`    | Drizzle pgTable definitions (3 backtest tables) |
+| `src/bot/backtest-state.ts`     | CRUD for backtest runs, trades, equity curve    |
+| `src/bot/backtest-portfolio.ts` | Virtual portfolio tracker (simulated fills)     |
+| `src/bot/backtest-metrics.ts`   | Performance metrics (Sharpe, drawdown, etc.)    |
+| `src/bot/backtest.ts`           | Main backtest engine — bar-by-bar loop          |
 
-### Database Schema (10 tables)
+### Database Schema (13 tables)
 
-| Table               | Purpose                                               |
-| ------------------- | ----------------------------------------------------- |
-| `strategies`        | Named strategy configs with markdown prompt + params  |
-| `accounts`          | Trading accounts (no credentials), linked to strategy |
-| `instruments`       | Market master data (epic, min deal size, margin)      |
-| `account_snapshots` | Equity curve snapshots per account                    |
-| `candles`           | Price data cache (OHLCV by epic + resolution)         |
-| `ticks`             | One row per bot execution cycle                       |
-| `signals`           | Strategy signals generated during ticks               |
-| `trades`            | Executed trade operations and outcomes                |
-| `positions`         | Tracked open positions and their lifecycle            |
-| `risk_state`        | Typed circuit breaker state per account               |
+| Table               | Purpose                                                  |
+| ------------------- | -------------------------------------------------------- |
+| `strategies`        | Named strategy configs with markdown prompt + params     |
+| `accounts`          | Trading accounts (no credentials), linked to strategy    |
+| `instruments`       | Market master data (epic, min deal size, margin)         |
+| `account_snapshots` | Equity curve snapshots per account                       |
+| `candles`           | Price data cache (OHLCV by epic + resolution)            |
+| `ticks`             | One row per bot execution cycle                          |
+| `signals`           | Strategy signals generated during ticks                  |
+| `trades`            | Executed trade operations and outcomes                   |
+| `positions`         | Tracked open positions and their lifecycle               |
+| `risk_state`        | Typed circuit breaker state per account                  |
+| `backtest_runs`     | One row per backtest execution (config, status, metrics) |
+| `backtest_trades`   | Simulated trades for each backtest run                   |
+| `backtest_equity`   | Equity curve points per backtest run                     |
 
 The `ticks`, `signals`, `trades`, and `positions` tables have a nullable
 `account_id` column for multi-account scoping. `NULL` means legacy
@@ -409,6 +419,7 @@ The daily reset key for circuit breaker is scoped per-account:
 | `trading-bot`        | Scheduled | Original single-account tick (cron)           |
 | `trading-bot-multi`  | Scheduled | Multi-account tick — iterates active accounts |
 | `trading-bot-manual` | Manual    | On-demand single tick for testing             |
+| `backtest`           | Manual    | On-demand backtest against historical candles |
 
 All tasks use `maxAttempts: 1` to prevent duplicate trades on retry.
 
