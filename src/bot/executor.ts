@@ -99,20 +99,24 @@ export async function executeOpenTrade(
   const now = new Date().toISOString();
 
   // Record the trade attempt in the database
-  const tradeId = await insertTrade(db, {
-    tickId,
-    signalId,
-    epic: signal.epic,
-    direction,
-    size: sizing.size,
-    orderType: "MARKET",
-    stopLevel: signal.suggestedStop ?? undefined,
-    limitLevel: signal.suggestedLimit ?? undefined,
-    status: "PENDING",
-    currencyCode: watchlistItem.currencyCode,
-    expiry: watchlistItem.expiry,
-    createdAt: now,
-  }, accountId);
+  const tradeId = await insertTrade(
+    db,
+    {
+      tickId,
+      signalId,
+      epic: signal.epic,
+      direction,
+      size: sizing.size,
+      orderType: "MARKET",
+      stopLevel: signal.suggestedStop ?? undefined,
+      limitLevel: signal.suggestedLimit ?? undefined,
+      status: "PENDING",
+      currencyCode: watchlistItem.currencyCode,
+      expiry: watchlistItem.expiry,
+      createdAt: now,
+    },
+    accountId,
+  );
 
   try {
     // Execute the trade via IG API
@@ -173,21 +177,25 @@ export async function executeOpenTrade(
 
     if (dealStatus === "ACCEPTED" && dealId) {
       // Track the position in our database
-      await insertPosition(db, {
-        dealId,
-        epic: signal.epic,
-        direction,
-        size: sizing.size,
-        entryPrice: (confirmation?.level as number) ?? signal.priceAtSignal,
-        currentStop: signal.suggestedStop ?? undefined,
-        currentLimit: signal.suggestedLimit ?? undefined,
-        strategy: signal.strategy,
-        status: "open",
-        currencyCode: watchlistItem.currencyCode,
-        expiry: watchlistItem.expiry,
-        openedAt: now,
-        openTradeId: tradeId,
-      }, accountId);
+      await insertPosition(
+        db,
+        {
+          dealId,
+          epic: signal.epic,
+          direction,
+          size: sizing.size,
+          entryPrice: (confirmation?.level as number) ?? signal.priceAtSignal,
+          currentStop: signal.suggestedStop ?? undefined,
+          currentLimit: signal.suggestedLimit ?? undefined,
+          strategy: signal.strategy,
+          status: "open",
+          currencyCode: watchlistItem.currencyCode,
+          expiry: watchlistItem.expiry,
+          openedAt: now,
+          openTradeId: tradeId,
+        },
+        accountId,
+      );
 
       return {
         success: true,
@@ -260,19 +268,23 @@ export async function executeCloseTrade(
   const closeDirection = direction === "BUY" ? "SELL" : "BUY";
 
   // Record the close attempt
-  const tradeId = await insertTrade(db, {
-    tickId,
-    signalId: signalId ?? undefined,
-    dealId,
-    epic,
-    direction: closeDirection,
-    size,
-    orderType: "MARKET",
-    status: "PENDING",
-    currencyCode,
-    expiry,
-    createdAt: now,
-  }, accountId);
+  const tradeId = await insertTrade(
+    db,
+    {
+      tickId,
+      signalId: signalId ?? undefined,
+      dealId,
+      epic,
+      direction: closeDirection,
+      size,
+      orderType: "MARKET",
+      status: "PENDING",
+      currencyCode,
+      expiry,
+      createdAt: now,
+    },
+    accountId,
+  );
 
   try {
     // Close via IG API (DELETE /positions/otc with body via _method override)

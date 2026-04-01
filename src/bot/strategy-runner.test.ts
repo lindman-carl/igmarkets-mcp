@@ -302,7 +302,10 @@ describe("runStrategy – mean-reversion", () => {
     const lowCandle: Candle = { open: 60, high: 61, low: 59, close: 60 };
     const candles = [...base, lowCandle];
 
-    const sentiment = { longPositionPercentage: 40, shortPositionPercentage: 60 };
+    const sentiment = {
+      longPositionPercentage: 40,
+      shortPositionPercentage: 60,
+    };
     const signals = runStrategy("mean-reversion", EPIC, candles, sentiment);
     const buys = signals.filter((s) => s.action === "buy");
     // May or may not signal depending on exact band placement, but we verify no errors
@@ -323,7 +326,10 @@ describe("runStrategy – mean-reversion", () => {
     const highCandle: Candle = { open: 160, high: 162, low: 158, close: 160 };
     const candles = [...base, highCandle];
 
-    const sentiment = { longPositionPercentage: 60, shortPositionPercentage: 40 };
+    const sentiment = {
+      longPositionPercentage: 60,
+      shortPositionPercentage: 40,
+    };
     const signals = runStrategy("mean-reversion", EPIC, candles, sentiment);
     expect(Array.isArray(signals)).toBe(true);
   });
@@ -346,7 +352,12 @@ describe("runStrategy – mean-reversion", () => {
     });
     // last close = SMA20 of base's last 20 ≈ 99.5 → nearMiddle = true
     const meanClose = base.slice(-20).reduce((s, c) => s + c.close, 0) / 20;
-    const lastCandle: Candle = { open: meanClose, high: meanClose + 2, low: meanClose - 2, close: meanClose };
+    const lastCandle: Candle = {
+      open: meanClose,
+      high: meanClose + 2,
+      low: meanClose - 2,
+      close: meanClose,
+    };
     const candles = [...base, lastCandle];
     const signals = runStrategy(
       "mean-reversion",
@@ -377,7 +388,10 @@ describe("runStrategy – sentiment-contrarian", () => {
 
   it("generates no signals without sufficient candles for ATR", () => {
     const candles = flatCandles(5, 100);
-    const sentiment = { longPositionPercentage: 80, shortPositionPercentage: 20 };
+    const sentiment = {
+      longPositionPercentage: 80,
+      shortPositionPercentage: 20,
+    };
     expect(
       runStrategy("sentiment-contrarian", EPIC, candles, sentiment),
     ).toHaveLength(0);
@@ -400,7 +414,10 @@ describe("runStrategy – sentiment-contrarian", () => {
     };
     const candles = [...base, nearResistance];
 
-    const sentiment = { longPositionPercentage: 80, shortPositionPercentage: 20 };
+    const sentiment = {
+      longPositionPercentage: 80,
+      shortPositionPercentage: 20,
+    };
     const signals = runStrategy(
       "sentiment-contrarian",
       EPIC,
@@ -426,7 +443,10 @@ describe("runStrategy – sentiment-contrarian", () => {
     const nearSupport: Candle = { open: 91, high: 92, low: 90, close: 91 };
     const candles = [...base, nearSupport];
 
-    const sentiment = { longPositionPercentage: 20, shortPositionPercentage: 80 };
+    const sentiment = {
+      longPositionPercentage: 20,
+      shortPositionPercentage: 80,
+    };
     const signals = runStrategy(
       "sentiment-contrarian",
       EPIC,
@@ -442,7 +462,10 @@ describe("runStrategy – sentiment-contrarian", () => {
 
   it("generates CLOSE exit when sentiment normalises", () => {
     const candles = trendingCandles(25, 100, 1, 2);
-    const normalSentiment = { longPositionPercentage: 55, shortPositionPercentage: 45 };
+    const normalSentiment = {
+      longPositionPercentage: 55,
+      shortPositionPercentage: 45,
+    };
     const signals = runStrategy(
       "sentiment-contrarian",
       EPIC,
@@ -463,9 +486,17 @@ describe("runStrategy – sentiment-contrarian", () => {
       low: 90,
       close: 100,
     }));
-    const nearResistance: Candle = { open: 108, high: 110, low: 106, close: 109 };
+    const nearResistance: Candle = {
+      open: 108,
+      high: 110,
+      low: 106,
+      close: 109,
+    };
     const candles = [...base, nearResistance];
-    const sentiment = { longPositionPercentage: 80, shortPositionPercentage: 20 };
+    const sentiment = {
+      longPositionPercentage: 80,
+      shortPositionPercentage: 20,
+    };
     const signals = runStrategy(
       "sentiment-contrarian",
       EPIC,
@@ -498,7 +529,10 @@ describe("runStrategy – signal structure", () => {
   for (const strategy of strategies) {
     it(`${strategy}: all signals have required fields`, () => {
       const candles = trendingCandles(30, 100, 0.5, 2);
-      const sentiment = { longPositionPercentage: 60, shortPositionPercentage: 40 };
+      const sentiment = {
+        longPositionPercentage: 60,
+        shortPositionPercentage: 40,
+      };
       const signals = runStrategy(strategy, EPIC, candles, sentiment);
       for (const sig of signals) {
         expect(sig.epic).toBe(EPIC);

@@ -7,14 +7,12 @@
  * - Successful tick with signals generated and trades executed
  * - Error handling when API calls fail
  *
- * Uses in-memory SQLite and mocked IGClient.
+ * Uses PGlite (in-memory PostgreSQL) and mocked IGClient.
  * skipAuth: true is used so no login/session refresh is attempted.
  */
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import * as schema from "../db/schema.js";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { createTestDb } from "../test/create-test-db.js";
 import type { BotDatabase } from "../db/connection.js";
 import {
   executeTick,
@@ -32,120 +30,6 @@ import { DEFAULT_CIRCUIT_BREAKER_STATE } from "./schemas.js";
 import type { IGClient } from "../ig-client.js";
 
 // ---------------------------------------------------------------------------
-// In-memory test database
-// ---------------------------------------------------------------------------
-
-function createTestDb(): BotDatabase {
-  const sqlite = new Database(":memory:");
-  sqlite.exec(`
-    CREATE TABLE IF NOT EXISTS strategies (
-      id             INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-      name           TEXT NOT NULL UNIQUE,
-      prompt         TEXT NOT NULL,
-      strategy_type  TEXT NOT NULL,
-      strategy_params TEXT,
-      risk_config    TEXT,
-      is_active      INTEGER DEFAULT true NOT NULL,
-      created_at     TEXT NOT NULL,
-      updated_at     TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS accounts (
-      id               INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-      name             TEXT NOT NULL UNIQUE,
-      ig_api_key       TEXT NOT NULL,
-      ig_username      TEXT NOT NULL,
-      ig_password      TEXT NOT NULL,
-      is_demo          INTEGER DEFAULT true NOT NULL,
-      strategy_id      INTEGER NOT NULL,
-      interval_minutes INTEGER DEFAULT 15 NOT NULL,
-      timezone         TEXT DEFAULT 'Europe/London' NOT NULL,
-      is_active        INTEGER DEFAULT true NOT NULL,
-      created_at       TEXT NOT NULL,
-      updated_at       TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS bot_state (
-      key   TEXT PRIMARY KEY NOT NULL,
-      value TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS positions (
-      id            INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-      account_id    INTEGER,
-      deal_id       TEXT NOT NULL UNIQUE,
-      epic          TEXT NOT NULL,
-      direction     TEXT NOT NULL,
-      size          REAL NOT NULL,
-      entry_price   REAL NOT NULL,
-      current_stop  REAL,
-      current_limit REAL,
-      strategy      TEXT,
-      status        TEXT DEFAULT 'open' NOT NULL,
-      exit_price    REAL,
-      realized_pnl  REAL,
-      currency_code TEXT NOT NULL,
-      expiry        TEXT NOT NULL,
-      opened_at     TEXT NOT NULL,
-      closed_at     TEXT,
-      open_trade_id  INTEGER,
-      close_trade_id INTEGER,
-      metadata      TEXT
-    );
-    CREATE TABLE IF NOT EXISTS signals (
-      id              INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-      account_id      INTEGER,
-      tick_id         INTEGER NOT NULL,
-      epic            TEXT NOT NULL,
-      strategy        TEXT NOT NULL,
-      action          TEXT NOT NULL,
-      signal_type     TEXT NOT NULL,
-      confidence      REAL,
-      price_at_signal REAL,
-      suggested_stop  REAL,
-      suggested_limit REAL,
-      suggested_size  REAL,
-      acted           INTEGER DEFAULT false,
-      skip_reason     TEXT,
-      created_at      TEXT NOT NULL,
-      indicator_data  TEXT
-    );
-    CREATE TABLE IF NOT EXISTS ticks (
-      id                  INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-      account_id          INTEGER,
-      started_at          TEXT NOT NULL,
-      completed_at        TEXT,
-      status              TEXT DEFAULT 'running' NOT NULL,
-      instruments_scanned INTEGER DEFAULT 0,
-      signals_generated   INTEGER DEFAULT 0,
-      trades_executed     INTEGER DEFAULT 0,
-      error               TEXT,
-      metadata            TEXT
-    );
-    CREATE TABLE IF NOT EXISTS trades (
-      id               INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-      account_id       INTEGER,
-      tick_id          INTEGER NOT NULL,
-      signal_id        INTEGER,
-      deal_reference   TEXT,
-      deal_id          TEXT,
-      epic             TEXT NOT NULL,
-      direction        TEXT NOT NULL,
-      size             REAL NOT NULL,
-      order_type       TEXT NOT NULL,
-      execution_price  REAL,
-      stop_level       REAL,
-      limit_level      REAL,
-      status           TEXT DEFAULT 'PENDING' NOT NULL,
-      reject_reason    TEXT,
-      currency_code    TEXT NOT NULL,
-      expiry           TEXT NOT NULL,
-      created_at       TEXT NOT NULL,
-      confirmation_data TEXT
-    );
-  `);
-  return drizzle({ client: sqlite, schema }) as unknown as BotDatabase;
-}
-
-// ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
 
@@ -156,7 +40,9 @@ const BASE_CONFIG = {
   username: "test-user",
   password: "test-pass",
   isDemo: true,
-  watchlist: [{ epic: "IX.D.FTSE.DAILY.IP", expiry: "DFB", currencyCode: "GBP" }],
+  watchlist: [
+    { epic: "IX.D.FTSE.DAILY.IP", expiry: "DFB", currencyCode: "GBP" },
+  ],
   strategy: "trend-following" as const,
 };
 
@@ -199,11 +85,13 @@ function candlesToIgPrices(candles: ReturnType<typeof makeBullishCandles>) {
 }
 
 /** A mock client that returns realistic IG API responses. */
-function createMockClient(overrides: Partial<{
-  request: ReturnType<typeof vi.fn>;
-  getAccountId: ReturnType<typeof vi.fn>;
-  isLoggedIn: ReturnType<typeof vi.fn>;
-}> = {}): IGClient {
+function createMockClient(
+  overrides: Partial<{
+    request: ReturnType<typeof vi.fn>;
+    getAccountId: ReturnType<typeof vi.fn>;
+    isLoggedIn: ReturnType<typeof vi.fn>;
+  }> = {},
+): IGClient {
   return {
     request: overrides.request ?? vi.fn().mockResolvedValue({}),
     getAccountId: overrides.getAccountId ?? vi.fn().mockReturnValue("ACC_001"),
@@ -219,8 +107,8 @@ function createMockClient(overrides: Partial<{
 describe("executeTick — circuit breaker", () => {
   let db: BotDatabase;
 
-  beforeEach(() => {
-    db = createTestDb();
+  beforeEach(async () => {
+    db = await createTestDb();
   });
 
   it("returns skipped status when circuit breaker is tripped", async () => {
@@ -248,8 +136,10 @@ describe("executeTick — circuit breaker", () => {
 
     // No API trade calls should have been made
     const calls = (client.request as ReturnType<typeof vi.fn>).mock.calls;
-    const tradeCalls = calls.filter((args: unknown[]) =>
-      typeof args[1] === "string" && (args[1] as string).includes("/positions/otc"),
+    const tradeCalls = calls.filter(
+      (args: unknown[]) =>
+        typeof args[1] === "string" &&
+        (args[1] as string).includes("/positions/otc"),
     );
     expect(tradeCalls).toHaveLength(0);
   });
@@ -283,20 +173,31 @@ describe("executeTick — circuit breaker", () => {
 describe("executeTick — insufficient candle data", () => {
   let db: BotDatabase;
 
-  beforeEach(() => {
-    db = createTestDb();
+  beforeEach(async () => {
+    db = await createTestDb();
   });
 
   it("completes the tick with 0 signals when candle data is sparse", async () => {
-    const mockRequest = vi.fn()
+    const mockRequest = vi
+      .fn()
       // GET /accounts (for balance check)
-      .mockResolvedValueOnce({ accounts: [{ accountId: "ACC_001", balance: { balance: 10000, available: 9000, profitLoss: 0 } }] })
+      .mockResolvedValueOnce({
+        accounts: [
+          {
+            accountId: "ACC_001",
+            balance: { balance: 10000, available: 9000, profitLoss: 0 },
+          },
+        ],
+      })
       // GET /prices/... (only 5 candles — insufficient)
       .mockResolvedValueOnce(candlesToIgPrices(makeThinCandles(5)))
       // GET /markets/... for sentiment (non-fatal)
       .mockResolvedValueOnce({ instrument: { marketId: "FTSE" } })
       // GET /clientsentiment/FTSE
-      .mockResolvedValueOnce({ longPositionPercentage: 55, shortPositionPercentage: 45 });
+      .mockResolvedValueOnce({
+        longPositionPercentage: 55,
+        shortPositionPercentage: 45,
+      });
 
     const client = createMockClient({ request: mockRequest });
     const result = await executeTick({
@@ -325,8 +226,8 @@ describe("executeTick — insufficient candle data", () => {
 describe("executeTick — happy path (sufficient candles, no trade signals)", () => {
   let db: BotDatabase;
 
-  beforeEach(() => {
-    db = createTestDb();
+  beforeEach(async () => {
+    db = await createTestDb();
   });
 
   it("completes successfully and records tick in DB", async () => {
@@ -338,15 +239,26 @@ describe("executeTick — happy path (sufficient candles, no trade signals)", ()
       close: 7500 + (i % 2 === 0 ? 1 : -1), // tiny alternating noise
     }));
 
-    const mockRequest = vi.fn()
+    const mockRequest = vi
+      .fn()
       // GET /accounts
-      .mockResolvedValueOnce({ accounts: [{ accountId: "ACC_001", balance: { balance: 10000, available: 9000, profitLoss: 0 } }] })
+      .mockResolvedValueOnce({
+        accounts: [
+          {
+            accountId: "ACC_001",
+            balance: { balance: 10000, available: 9000, profitLoss: 0 },
+          },
+        ],
+      })
       // GET /prices/.../DAY/30
       .mockResolvedValueOnce(candlesToIgPrices(flatCandles))
       // GET /markets/... (for sentiment)
       .mockResolvedValueOnce({ instrument: { marketId: "FTSE" } })
       // GET /clientsentiment/FTSE
-      .mockResolvedValueOnce({ longPositionPercentage: 50, shortPositionPercentage: 50 })
+      .mockResolvedValueOnce({
+        longPositionPercentage: 50,
+        shortPositionPercentage: 50,
+      })
       // GET /markets/... for min deal size (if a signal fires — will be skipped or no-op)
       .mockResolvedValue({});
 
@@ -376,8 +288,8 @@ describe("executeTick — happy path (sufficient candles, no trade signals)", ()
 describe("executeTick — result structure", () => {
   let db: BotDatabase;
 
-  beforeEach(() => {
-    db = createTestDb();
+  beforeEach(async () => {
+    db = await createTestDb();
   });
 
   it("always returns a valid TickResult shape", async () => {
@@ -419,8 +331,18 @@ describe("executeTick — result structure", () => {
   it("increments tickId on successive ticks", async () => {
     const client = createMockClient();
 
-    const r1 = await executeTick({ config: BASE_CONFIG, db, client, skipAuth: true });
-    const r2 = await executeTick({ config: BASE_CONFIG, db, client, skipAuth: true });
+    const r1 = await executeTick({
+      config: BASE_CONFIG,
+      db,
+      client,
+      skipAuth: true,
+    });
+    const r2 = await executeTick({
+      config: BASE_CONFIG,
+      db,
+      client,
+      skipAuth: true,
+    });
 
     expect(r2.tickId).toBeGreaterThan(r1.tickId);
   });
@@ -432,14 +354,26 @@ describe("executeTick — result structure", () => {
 
 describe("executeAccountTick", () => {
   let db: BotDatabase;
+  const savedEnv: Record<string, string | undefined> = {};
 
-  beforeEach(() => {
-    db = createTestDb();
+  beforeEach(async () => {
+    db = await createTestDb();
+    // Save and set required IG env vars for executeAccountTick
+    for (const key of ["IG_API_KEY", "IG_USERNAME", "IG_PASSWORD"] as const) {
+      savedEnv[key] = process.env[key];
+      process.env[key] = `test-${key.toLowerCase()}`;
+    }
   });
 
-  it("executes a tick using account credentials and strategy frontmatter", async () => {
-    const now = new Date().toISOString();
+  afterEach(() => {
+    // Restore original env vars
+    for (const [key, val] of Object.entries(savedEnv)) {
+      if (val === undefined) delete process.env[key];
+      else process.env[key] = val;
+    }
+  });
 
+  it("executes a tick using account and strategy frontmatter", async () => {
     // Insert a strategy with frontmatter defining tickers
     const strategyId = await insertStrategy(db, {
       name: "FTSE Trend",
@@ -459,38 +393,45 @@ maxOpenPositions: 2
 Buy when SMA10 > SMA20.
 `,
       strategyType: "trend-following",
-      createdAt: now,
-      updatedAt: now,
     });
 
-    // Insert an account linked to the strategy
+    // Insert an account linked to the strategy (no credentials)
     const accountId = await insertAccount(db, {
       name: "Test Account",
-      igApiKey: "test-key",
-      igUsername: "test-user",
-      igPassword: "test-pass",
       isDemo: true,
       strategyId,
-      createdAt: now,
-      updatedAt: now,
     });
 
     // Mock client that returns enough data for tick to complete
-    const mockRequest = vi.fn()
+    const mockRequest = vi
+      .fn()
       // GET /accounts
       .mockResolvedValueOnce({
-        accounts: [{ accountId: "ACC_001", balance: { balance: 10000, available: 9000, profitLoss: 0 } }],
+        accounts: [
+          {
+            accountId: "ACC_001",
+            balance: { balance: 10000, available: 9000, profitLoss: 0 },
+          },
+        ],
       })
       // GET /prices/.../DAY/30 — flat candles, no signals expected
-      .mockResolvedValueOnce(candlesToIgPrices(
-        Array.from({ length: 30 }, () => ({
-          open: 7500, high: 7505, low: 7495, close: 7500,
-        })),
-      ))
+      .mockResolvedValueOnce(
+        candlesToIgPrices(
+          Array.from({ length: 30 }, () => ({
+            open: 7500,
+            high: 7505,
+            low: 7495,
+            close: 7500,
+          })),
+        ),
+      )
       // GET /markets/... for sentiment
       .mockResolvedValueOnce({ instrument: { marketId: "FTSE" } })
       // GET /clientsentiment/FTSE
-      .mockResolvedValueOnce({ longPositionPercentage: 50, shortPositionPercentage: 50 })
+      .mockResolvedValueOnce({
+        longPositionPercentage: 50,
+        shortPositionPercentage: 50,
+      })
       .mockResolvedValue({});
 
     const client = createMockClient({ request: mockRequest });
@@ -521,8 +462,6 @@ Buy when SMA10 > SMA20.
   });
 
   it("returns error if strategy has no tickers in frontmatter", async () => {
-    const now = new Date().toISOString();
-
     const strategyId = await insertStrategy(db, {
       name: "Empty Strategy",
       prompt: `---
@@ -533,19 +472,12 @@ strategyType: "trend-following"
 No tickers defined.
 `,
       strategyType: "trend-following",
-      createdAt: now,
-      updatedAt: now,
     });
 
     const accountId = await insertAccount(db, {
       name: "Test Account 2",
-      igApiKey: "test-key",
-      igUsername: "test-user",
-      igPassword: "test-pass",
       isDemo: true,
       strategyId,
-      createdAt: now,
-      updatedAt: now,
     });
 
     const { getAccount, getStrategy } = await import("./state.js");
@@ -571,8 +503,8 @@ No tickers defined.
 describe("executeAllAccountTicks", () => {
   let db: BotDatabase;
 
-  beforeEach(() => {
-    db = createTestDb();
+  beforeEach(async () => {
+    db = await createTestDb();
   });
 
   it("returns empty results when no active accounts exist", async () => {
@@ -584,8 +516,6 @@ describe("executeAllAccountTicks", () => {
   });
 
   it("skips accounts with inactive strategies", async () => {
-    const now = new Date().toISOString();
-
     const strategyId = await insertStrategy(db, {
       name: "Inactive Strategy",
       prompt: `---
@@ -599,19 +529,12 @@ Inactive.
 `,
       strategyType: "trend-following",
       isActive: false,
-      createdAt: now,
-      updatedAt: now,
     });
 
     await insertAccount(db, {
       name: "Account With Inactive Strategy",
-      igApiKey: "key",
-      igUsername: "user",
-      igPassword: "pass",
       isDemo: true,
       strategyId,
-      createdAt: now,
-      updatedAt: now,
     });
 
     const result = await executeAllAccountTicks({ db });
@@ -623,17 +546,10 @@ Inactive.
   });
 
   it("reports error when strategy is missing from DB", async () => {
-    const now = new Date().toISOString();
-
     await insertAccount(db, {
       name: "Orphan Account",
-      igApiKey: "key",
-      igUsername: "user",
-      igPassword: "pass",
       isDemo: true,
       strategyId: 999, // does not exist
-      createdAt: now,
-      updatedAt: now,
     });
 
     const result = await executeAllAccountTicks({ db });
@@ -646,8 +562,6 @@ Inactive.
   });
 
   it("processes multiple active accounts sequentially", async () => {
-    const now = new Date().toISOString();
-
     // Create two strategies
     const s1Id = await insertStrategy(db, {
       name: "Strategy A",
@@ -661,8 +575,6 @@ strategyType: "trend-following"
 Strategy A rules.
 `,
       strategyType: "trend-following",
-      createdAt: now,
-      updatedAt: now,
     });
 
     const s2Id = await insertStrategy(db, {
@@ -677,31 +589,19 @@ strategyType: "breakout"
 Strategy B rules.
 `,
       strategyType: "breakout",
-      createdAt: now,
-      updatedAt: now,
     });
 
-    // Create two accounts
+    // Create two accounts (no credentials)
     await insertAccount(db, {
       name: "Account A",
-      igApiKey: "key-a",
-      igUsername: "user-a",
-      igPassword: "pass-a",
       isDemo: true,
       strategyId: s1Id,
-      createdAt: now,
-      updatedAt: now,
     });
 
     await insertAccount(db, {
       name: "Account B",
-      igApiKey: "key-b",
-      igUsername: "user-b",
-      igPassword: "pass-b",
       isDemo: true,
       strategyId: s2Id,
-      createdAt: now,
-      updatedAt: now,
     });
 
     // We can't easily mock the IGClient creation inside executeAllAccountTicks,
@@ -717,8 +617,12 @@ Strategy B rules.
     expect(result.results[0].accountName).toBeDefined();
     expect(result.results[1].accountName).toBeDefined();
     // They will fail because we can't reach IG API, but they were processed
-    expect(result.results.every((r) =>
-      r.tickResult.status === "error" || r.tickResult.status === "completed"
-    )).toBe(true);
+    expect(
+      result.results.every(
+        (r) =>
+          r.tickResult.status === "error" ||
+          r.tickResult.status === "completed",
+      ),
+    ).toBe(true);
   });
 });

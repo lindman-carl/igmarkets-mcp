@@ -151,7 +151,7 @@ Done (wait for next tick)
 #### 1. Install dependencies
 
 ```bash
-npm install
+pnpm install
 ```
 
 #### 2. Run database migrations
@@ -160,7 +160,7 @@ The bot uses SQLite for state persistence. Migrations run automatically on first
 tick, or you can run them manually:
 
 ```bash
-npm run db:migrate
+pnpm run db:migrate
 ```
 
 #### 3. Configure the bot
@@ -318,16 +318,16 @@ The bot uses SQLite (via Drizzle ORM) with 5 tables:
 
 Database files are excluded from git (see `.gitignore`).
 
-### NPM Scripts
+### Scripts
 
-| Script                | Description                 |
-| --------------------- | --------------------------- |
-| `npm run build`       | Compile TypeScript          |
-| `npm run typecheck`   | Type-check without emitting |
-| `npm run db:generate` | Generate Drizzle migrations |
-| `npm run db:push`     | Push schema to database     |
-| `npm run db:studio`   | Open Drizzle Studio (GUI)   |
-| `npm run db:migrate`  | Run pending migrations      |
+| Script                 | Description                 |
+| ---------------------- | --------------------------- |
+| `pnpm run build`       | Compile TypeScript          |
+| `pnpm run typecheck`   | Type-check without emitting |
+| `pnpm run db:generate` | Generate Drizzle migrations |
+| `pnpm run db:push`     | Push schema to database     |
+| `pnpm run db:studio`   | Open Drizzle Studio (GUI)   |
+| `pnpm run db:migrate`  | Run pending migrations      |
 
 ## Development
 

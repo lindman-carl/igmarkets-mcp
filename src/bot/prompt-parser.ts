@@ -74,9 +74,7 @@ const FRONTMATTER_RE = /^---\s*\n([\s\S]*?)\n---\s*(?:\n|$)/;
  *
  * This is intentionally simple — no multi-line strings, anchors, tags, etc.
  */
-export function parseSimpleYaml(
-  yaml: string,
-): Record<string, unknown> {
+export function parseSimpleYaml(yaml: string): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   const lines = yaml.split("\n");
 
@@ -151,7 +149,10 @@ function collectIndented(
     }
   }
   // Trim trailing empty lines
-  while (collected.length > 0 && collected[collected.length - 1].trim() === "") {
+  while (
+    collected.length > 0 &&
+    collected[collected.length - 1].trim() === ""
+  ) {
     collected.pop();
   }
   return { lines: collected, nextIndex: i };

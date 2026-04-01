@@ -2,13 +2,11 @@
  * Executor Tests
  *
  * Tests for executeOpenTrade and executeCloseTrade.
- * Uses an in-memory SQLite database and a mocked IGClient.
+ * Uses PGlite (in-memory PostgreSQL) and a mocked IGClient.
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import * as schema from "../db/schema.js";
+import { createTestDb } from "../test/create-test-db.js";
 import type { BotDatabase } from "../db/connection.js";
 import { executeOpenTrade, executeCloseTrade } from "./executor.js";
 import type { StrategySignal } from "./strategy-runner.js";
@@ -21,120 +19,6 @@ import {
   insertPosition,
 } from "./state.js";
 import type { IGClient } from "../ig-client.js";
-
-// ---------------------------------------------------------------------------
-// In-memory test database (same DDL as migration)
-// ---------------------------------------------------------------------------
-
-function createTestDb(): BotDatabase {
-  const sqlite = new Database(":memory:");
-  sqlite.exec(`
-    CREATE TABLE IF NOT EXISTS strategies (
-      id             INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-      name           TEXT NOT NULL UNIQUE,
-      prompt         TEXT NOT NULL,
-      strategy_type  TEXT NOT NULL,
-      strategy_params TEXT,
-      risk_config    TEXT,
-      is_active      INTEGER DEFAULT true NOT NULL,
-      created_at     TEXT NOT NULL,
-      updated_at     TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS accounts (
-      id               INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-      name             TEXT NOT NULL UNIQUE,
-      ig_api_key       TEXT NOT NULL,
-      ig_username      TEXT NOT NULL,
-      ig_password      TEXT NOT NULL,
-      is_demo          INTEGER DEFAULT true NOT NULL,
-      strategy_id      INTEGER NOT NULL,
-      interval_minutes INTEGER DEFAULT 15 NOT NULL,
-      timezone         TEXT DEFAULT 'Europe/London' NOT NULL,
-      is_active        INTEGER DEFAULT true NOT NULL,
-      created_at       TEXT NOT NULL,
-      updated_at       TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS bot_state (
-      key   TEXT PRIMARY KEY NOT NULL,
-      value TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS positions (
-      id            INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-      account_id    INTEGER,
-      deal_id       TEXT NOT NULL UNIQUE,
-      epic          TEXT NOT NULL,
-      direction     TEXT NOT NULL,
-      size          REAL NOT NULL,
-      entry_price   REAL NOT NULL,
-      current_stop  REAL,
-      current_limit REAL,
-      strategy      TEXT,
-      status        TEXT DEFAULT 'open' NOT NULL,
-      exit_price    REAL,
-      realized_pnl  REAL,
-      currency_code TEXT NOT NULL,
-      expiry        TEXT NOT NULL,
-      opened_at     TEXT NOT NULL,
-      closed_at     TEXT,
-      open_trade_id  INTEGER,
-      close_trade_id INTEGER,
-      metadata      TEXT
-    );
-    CREATE TABLE IF NOT EXISTS signals (
-      id              INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-      account_id      INTEGER,
-      tick_id         INTEGER NOT NULL,
-      epic            TEXT NOT NULL,
-      strategy        TEXT NOT NULL,
-      action          TEXT NOT NULL,
-      signal_type     TEXT NOT NULL,
-      confidence      REAL,
-      price_at_signal REAL,
-      suggested_stop  REAL,
-      suggested_limit REAL,
-      suggested_size  REAL,
-      acted           INTEGER DEFAULT false,
-      skip_reason     TEXT,
-      created_at      TEXT NOT NULL,
-      indicator_data  TEXT
-    );
-    CREATE TABLE IF NOT EXISTS ticks (
-      id                  INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-      account_id          INTEGER,
-      started_at          TEXT NOT NULL,
-      completed_at        TEXT,
-      status              TEXT DEFAULT 'running' NOT NULL,
-      instruments_scanned INTEGER DEFAULT 0,
-      signals_generated   INTEGER DEFAULT 0,
-      trades_executed     INTEGER DEFAULT 0,
-      error               TEXT,
-      metadata            TEXT
-    );
-    CREATE TABLE IF NOT EXISTS trades (
-      id               INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-      account_id       INTEGER,
-      tick_id          INTEGER NOT NULL,
-      signal_id        INTEGER,
-      deal_reference   TEXT,
-      deal_id          TEXT,
-      epic             TEXT NOT NULL,
-      direction        TEXT NOT NULL,
-      size             REAL NOT NULL,
-      order_type       TEXT NOT NULL,
-      execution_price  REAL,
-      stop_level       REAL,
-      limit_level      REAL,
-      status           TEXT DEFAULT 'PENDING' NOT NULL,
-      reject_reason    TEXT,
-      currency_code    TEXT NOT NULL,
-      expiry           TEXT NOT NULL,
-      created_at       TEXT NOT NULL,
-      confirmation_data TEXT
-    );
-  `);
-  return drizzle({ client: sqlite, schema }) as unknown as BotDatabase;
-}
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -215,7 +99,7 @@ describe("executeOpenTrade", () => {
   let tickId: number;
 
   beforeEach(async () => {
-    db = createTestDb();
+    db = await createTestDb();
     tickId = await startTick(db, { startedAt: NOW, status: "running" });
   });
 
@@ -235,7 +119,9 @@ describe("executeOpenTrade", () => {
     expect(result.dealReference).toBeNull();
     expect(result.tradeId).toBeNull();
     // No API call should have been made
-    expect((client.request as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0);
+    expect(
+      (client.request as ReturnType<typeof vi.fn>).mock.calls,
+    ).toHaveLength(0);
   });
 
   it("records a PENDING trade then updates to REJECTED when no dealReference returned", async () => {
@@ -263,9 +149,11 @@ describe("executeOpenTrade", () => {
   });
 
   it("records position and returns OPEN on successful deal confirmation", async () => {
-    const mockRequest = vi.fn()
-      .mockResolvedValueOnce({ dealReference: "REF_001" })  // POST /positions/otc
-      .mockResolvedValueOnce({                               // GET /confirms/REF_001
+    const mockRequest = vi
+      .fn()
+      .mockResolvedValueOnce({ dealReference: "REF_001" }) // POST /positions/otc
+      .mockResolvedValueOnce({
+        // GET /confirms/REF_001
         dealStatus: "ACCEPTED",
         dealId: "DEAL_001",
         level: 7502,
@@ -303,7 +191,8 @@ describe("executeOpenTrade", () => {
   });
 
   it("returns REJECTED when deal confirmation status is not ACCEPTED", async () => {
-    const mockRequest = vi.fn()
+    const mockRequest = vi
+      .fn()
       .mockResolvedValueOnce({ dealReference: "REF_002" })
       .mockResolvedValueOnce({
         dealStatus: "REJECTED",
@@ -332,7 +221,9 @@ describe("executeOpenTrade", () => {
   });
 
   it("handles API errors gracefully and returns ERROR status", async () => {
-    const mockRequest = vi.fn().mockRejectedValueOnce(new Error("Network timeout"));
+    const mockRequest = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("Network timeout"));
 
     const client = createMockClient({ request: mockRequest });
 
@@ -356,7 +247,8 @@ describe("executeOpenTrade", () => {
   });
 
   it("works for SELL direction signal", async () => {
-    const mockRequest = vi.fn()
+    const mockRequest = vi
+      .fn()
       .mockResolvedValueOnce({ dealReference: "REF_SELL" })
       .mockResolvedValueOnce({
         dealStatus: "ACCEPTED",
@@ -382,9 +274,14 @@ describe("executeOpenTrade", () => {
   });
 
   it("sends correct body to the IG API", async () => {
-    const mockRequest = vi.fn()
+    const mockRequest = vi
+      .fn()
       .mockResolvedValueOnce({ dealReference: "REF_BODY" })
-      .mockResolvedValueOnce({ dealStatus: "ACCEPTED", dealId: "DEAL_BODY", level: 7500 });
+      .mockResolvedValueOnce({
+        dealStatus: "ACCEPTED",
+        dealId: "DEAL_BODY",
+        level: 7500,
+      });
 
     const client = createMockClient({ request: mockRequest });
 
@@ -421,7 +318,7 @@ describe("executeCloseTrade", () => {
   let tickId: number;
 
   beforeEach(async () => {
-    db = createTestDb();
+    db = await createTestDb();
     tickId = await startTick(db, { startedAt: NOW, status: "running" });
     // Pre-insert a tracked position to close
     await insertPosition(db, {
@@ -459,9 +356,11 @@ describe("executeCloseTrade", () => {
   });
 
   it("closes position in DB on successful confirmation", async () => {
-    const mockRequest = vi.fn()
-      .mockResolvedValueOnce({ dealReference: "REF_CLOSE" })        // DELETE
-      .mockResolvedValueOnce({                                        // GET /confirms
+    const mockRequest = vi
+      .fn()
+      .mockResolvedValueOnce({ dealReference: "REF_CLOSE" }) // DELETE
+      .mockResolvedValueOnce({
+        // GET /confirms
         dealStatus: "ACCEPTED",
         dealId: "DEAL_CLOSE_OUT",
         level: 7650,
@@ -506,9 +405,14 @@ describe("executeCloseTrade", () => {
       status: "open",
     });
 
-    const mockRequest = vi.fn()
+    const mockRequest = vi
+      .fn()
       .mockResolvedValueOnce({ dealReference: "REF_SHORT_CLOSE" })
-      .mockResolvedValueOnce({ dealStatus: "ACCEPTED", dealId: "DEAL_SHORT_OUT", level: 7400 });
+      .mockResolvedValueOnce({
+        dealStatus: "ACCEPTED",
+        dealId: "DEAL_SHORT_OUT",
+        level: 7400,
+      });
 
     const client = createMockClient({ request: mockRequest });
 
@@ -529,16 +433,21 @@ describe("executeCloseTrade", () => {
   });
 
   it("uses opposite direction when sending close request", async () => {
-    const mockRequest = vi.fn()
+    const mockRequest = vi
+      .fn()
       .mockResolvedValueOnce({ dealReference: "REF_DIR" })
-      .mockResolvedValueOnce({ dealStatus: "ACCEPTED", dealId: "X", level: 7600 });
+      .mockResolvedValueOnce({
+        dealStatus: "ACCEPTED",
+        dealId: "X",
+        level: 7600,
+      });
 
     const client = createMockClient({ request: mockRequest });
 
     await executeCloseTrade(client, db, {
       dealId: "DEAL_OPEN",
       epic: "IX.D.FTSE.DAILY.IP",
-      direction: "BUY",  // position direction
+      direction: "BUY", // position direction
       size: 2,
       tickId,
       signalId: null,

@@ -20,7 +20,7 @@
  * Or from a bot-config.json file in the project root.
  *
  * Setup:
- *   1. Install: npm install @trigger.dev/sdk
+ *   1. Install: pnpm add @trigger.dev/sdk
  *   2. Configure trigger.config.ts (set project ref)
  *   3. Set environment variables in Trigger.dev dashboard
  *   4. Deploy: npx trigger.dev deploy
@@ -131,9 +131,13 @@ export const tradingBotMulti = schedules.task({
     triggerLogger.info("Multi-account trading bot tick completed", {
       totalAccounts: result.totalAccounts,
       durationMs: result.durationMs,
-      completed: result.results.filter((r) => r.tickResult.status === "completed").length,
-      skipped: result.results.filter((r) => r.tickResult.status === "skipped").length,
-      errors: result.results.filter((r) => r.tickResult.status === "error").length,
+      completed: result.results.filter(
+        (r) => r.tickResult.status === "completed",
+      ).length,
+      skipped: result.results.filter((r) => r.tickResult.status === "skipped")
+        .length,
+      errors: result.results.filter((r) => r.tickResult.status === "error")
+        .length,
     });
 
     return {

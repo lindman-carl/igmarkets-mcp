@@ -1,47 +1,57 @@
 /**
- * Database Connection - SQLite via Drizzle ORM
+ * Database Connection - PostgreSQL via Drizzle ORM
  *
  * Provides a singleton database connection for the trading bot.
- * Uses better-sqlite3 for synchronous SQLite access.
+ * Uses node-postgres (pg) Pool for async PostgreSQL access.
  */
 
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/node-postgres";
+import pg from "pg";
 import * as schema from "./schema.js";
+
+const { Pool } = pg;
+
+const DEFAULT_DATABASE_URL =
+  "postgresql://igmarkets:igmarkets@localhost:5432/igmarkets";
 
 export type BotDatabase = ReturnType<typeof createDatabase>;
 
 let db: BotDatabase | null = null;
+let pool: pg.Pool | null = null;
 
 /**
- * Create a new Drizzle database instance backed by SQLite.
+ * Create a new Drizzle database instance backed by PostgreSQL.
  *
- * @param dbPath - Path to the SQLite database file (default: "bot.db")
+ * @param databaseUrl - PostgreSQL connection URL (default: DATABASE_URL env or localhost)
  */
-export function createDatabase(dbPath = "bot.db"): ReturnType<typeof drizzle> {
-  const sqlite = new Database(dbPath);
-
-  // Enable WAL mode for better concurrent read performance
-  sqlite.pragma("journal_mode = WAL");
-
-  return drizzle({ client: sqlite, schema });
+export function createDatabase(
+  databaseUrl?: string,
+): ReturnType<typeof drizzle> {
+  const url = databaseUrl ?? process.env.DATABASE_URL ?? DEFAULT_DATABASE_URL;
+  const newPool = new Pool({ connectionString: url });
+  pool = newPool;
+  return drizzle({ client: newPool, schema });
 }
 
 /**
  * Get or create the singleton database instance.
  *
- * @param dbPath - Path to the SQLite database file
+ * @param databaseUrl - PostgreSQL connection URL
  */
-export function getDatabase(dbPath?: string): BotDatabase {
+export function getDatabase(databaseUrl?: string): BotDatabase {
   if (!db) {
-    db = createDatabase(dbPath);
+    db = createDatabase(databaseUrl);
   }
   return db;
 }
 
 /**
- * Close the singleton database connection.
+ * Close the singleton database connection and drain the pool.
  */
-export function closeDatabase(): void {
+export async function closeDatabase(): Promise<void> {
+  if (pool) {
+    await pool.end();
+    pool = null;
+  }
   db = null;
 }

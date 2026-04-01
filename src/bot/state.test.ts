@@ -1,7 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import * as schema from "../db/schema.js";
+import { createTestDb } from "../test/create-test-db.js";
 import type { BotDatabase } from "../db/connection.js";
 import {
   startTick,
@@ -23,9 +21,9 @@ import {
   updatePositionLevels,
   closeTrackedPosition,
   getClosedPositions,
-  getState,
-  setState,
-  deleteState,
+  getRiskState,
+  upsertRiskState,
+  resetRiskState,
   getCircuitBreakerState,
   setCircuitBreakerState,
   getTickSummary,
@@ -41,136 +39,28 @@ import {
   getActiveAccounts,
   updateAccount,
   deleteAccount,
+  insertInstrument,
+  getInstrument,
+  upsertInstrument,
+  getStaleInstruments,
+  insertAccountSnapshot,
+  getRecentSnapshots,
+  getSnapshotsInRange,
+  upsertCandles,
+  getCandles,
+  getCandleRange,
+  pruneOldCandles,
 } from "./state.js";
-import { DEFAULT_CIRCUIT_BREAKER_STATE } from "./schemas.js";
-
-// ---------------------------------------------------------------------------
-// In-memory test database
-// ---------------------------------------------------------------------------
-
-/**
- * Create a fresh in-memory SQLite database with all tables applied.
- * Each test gets its own isolated instance.
- */
-function createTestDb(): BotDatabase {
-  const sqlite = new Database(":memory:");
-
-  // Apply schema manually (same DDL as the migration file)
-  sqlite.exec(`
-    CREATE TABLE IF NOT EXISTS strategies (
-      id             INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-      name           TEXT NOT NULL UNIQUE,
-      prompt         TEXT NOT NULL,
-      strategy_type  TEXT NOT NULL,
-      strategy_params TEXT,
-      risk_config    TEXT,
-      is_active      INTEGER DEFAULT true NOT NULL,
-      created_at     TEXT NOT NULL,
-      updated_at     TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS accounts (
-      id               INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-      name             TEXT NOT NULL UNIQUE,
-      ig_api_key       TEXT NOT NULL,
-      ig_username      TEXT NOT NULL,
-      ig_password      TEXT NOT NULL,
-      is_demo          INTEGER DEFAULT true NOT NULL,
-      strategy_id      INTEGER NOT NULL,
-      interval_minutes INTEGER DEFAULT 15 NOT NULL,
-      timezone         TEXT DEFAULT 'Europe/London' NOT NULL,
-      is_active        INTEGER DEFAULT true NOT NULL,
-      created_at       TEXT NOT NULL,
-      updated_at       TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS bot_state (
-      key   TEXT PRIMARY KEY NOT NULL,
-      value TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS positions (
-      id            INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-      account_id    INTEGER,
-      deal_id       TEXT NOT NULL UNIQUE,
-      epic          TEXT NOT NULL,
-      direction     TEXT NOT NULL,
-      size          REAL NOT NULL,
-      entry_price   REAL NOT NULL,
-      current_stop  REAL,
-      current_limit REAL,
-      strategy      TEXT,
-      status        TEXT DEFAULT 'open' NOT NULL,
-      exit_price    REAL,
-      realized_pnl  REAL,
-      currency_code TEXT NOT NULL,
-      expiry        TEXT NOT NULL,
-      opened_at     TEXT NOT NULL,
-      closed_at     TEXT,
-      open_trade_id  INTEGER,
-      close_trade_id INTEGER,
-      metadata      TEXT
-    );
-    CREATE TABLE IF NOT EXISTS signals (
-      id              INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-      account_id      INTEGER,
-      tick_id         INTEGER NOT NULL,
-      epic            TEXT NOT NULL,
-      strategy        TEXT NOT NULL,
-      action          TEXT NOT NULL,
-      signal_type     TEXT NOT NULL,
-      confidence      REAL,
-      price_at_signal REAL,
-      suggested_stop  REAL,
-      suggested_limit REAL,
-      suggested_size  REAL,
-      acted           INTEGER DEFAULT false,
-      skip_reason     TEXT,
-      created_at      TEXT NOT NULL,
-      indicator_data  TEXT
-    );
-    CREATE TABLE IF NOT EXISTS ticks (
-      id                  INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-      account_id          INTEGER,
-      started_at          TEXT NOT NULL,
-      completed_at        TEXT,
-      status              TEXT DEFAULT 'running' NOT NULL,
-      instruments_scanned INTEGER DEFAULT 0,
-      signals_generated   INTEGER DEFAULT 0,
-      trades_executed     INTEGER DEFAULT 0,
-      error               TEXT,
-      metadata            TEXT
-    );
-    CREATE TABLE IF NOT EXISTS trades (
-      id               INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-      account_id       INTEGER,
-      tick_id          INTEGER NOT NULL,
-      signal_id        INTEGER,
-      deal_reference   TEXT,
-      deal_id          TEXT,
-      epic             TEXT NOT NULL,
-      direction        TEXT NOT NULL,
-      size             REAL NOT NULL,
-      order_type       TEXT NOT NULL,
-      execution_price  REAL,
-      stop_level       REAL,
-      limit_level      REAL,
-      status           TEXT DEFAULT 'PENDING' NOT NULL,
-      reject_reason    TEXT,
-      currency_code    TEXT NOT NULL,
-      expiry           TEXT NOT NULL,
-      created_at       TEXT NOT NULL,
-      confirmation_data TEXT
-    );
-  `);
-
-  return drizzle({ client: sqlite, schema }) as unknown as BotDatabase;
-}
+import {
+  DEFAULT_CIRCUIT_BREAKER_STATE,
+  DEFAULT_RISK_STATE,
+} from "./schemas.js";
 
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
 
 const NOW = new Date().toISOString();
-const TODAY = NOW.split("T")[0]; // "YYYY-MM-DD"
 
 // ---------------------------------------------------------------------------
 // Tick operations
@@ -178,8 +68,8 @@ const TODAY = NOW.split("T")[0]; // "YYYY-MM-DD"
 
 describe("startTick / completeTick / getLastTick", () => {
   let db: BotDatabase;
-  beforeEach(() => {
-    db = createTestDb();
+  beforeEach(async () => {
+    db = await createTestDb();
   });
 
   it("startTick returns a numeric id", async () => {
@@ -211,7 +101,7 @@ describe("startTick / completeTick / getLastTick", () => {
   });
 
   it("getLastTick returns only completed ticks, not running", async () => {
-    await startTick(db, { startedAt: NOW, status: "running" }); // running tick — should be ignored
+    await startTick(db, { startedAt: NOW, status: "running" });
     const tick = await getLastTick(db);
     expect(tick).toBeNull();
   });
@@ -237,7 +127,7 @@ describe("insertSignal / getSignalsByTick / getRecentSignals", () => {
   let tickId: number;
 
   beforeEach(async () => {
-    db = createTestDb();
+    db = await createTestDb();
     tickId = await startTick(db, { startedAt: NOW, status: "running" });
   });
 
@@ -335,7 +225,7 @@ describe("insertTrade / updateTradeConfirmation / getTradesByTick", () => {
   let tickId: number;
 
   beforeEach(async () => {
-    db = createTestDb();
+    db = await createTestDb();
     tickId = await startTick(db, { startedAt: NOW, status: "running" });
   });
 
@@ -403,11 +293,13 @@ describe("insertTrade / updateTradeConfirmation / getTradesByTick", () => {
 describe("insertPosition / getOpenPositions / closeTrackedPosition", () => {
   let db: BotDatabase;
 
-  beforeEach(() => {
-    db = createTestDb();
+  beforeEach(async () => {
+    db = await createTestDb();
   });
 
-  async function insertTestPosition(overrides: Partial<Parameters<typeof insertPosition>[1]> = {}) {
+  async function insertTestPosition(
+    overrides: Partial<Parameters<typeof insertPosition>[1]> = {},
+  ) {
     return insertPosition(db, {
       dealId: `DEAL_${Math.random().toString(36).slice(2)}`,
       epic: "IX.D.FTSE.DAILY.IP",
@@ -442,7 +334,7 @@ describe("insertPosition / getOpenPositions / closeTrackedPosition", () => {
       createdAt: NOW,
     });
     // Insert a closed position
-    const closedId = await insertTestPosition({ dealId: "DEAL_CLOSED" });
+    await insertTestPosition({ dealId: "DEAL_CLOSED" });
     await closeTrackedPosition(db, "DEAL_CLOSED", {
       exitPrice: 7600,
       realizedPnl: 100,
@@ -505,58 +397,78 @@ describe("insertPosition / getOpenPositions / closeTrackedPosition", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Key-value state store
+// Risk State (typed, replaces old bot_state KV)
 // ---------------------------------------------------------------------------
 
-describe("getState / setState / deleteState", () => {
+describe("getRiskState / upsertRiskState / resetRiskState", () => {
   let db: BotDatabase;
-  beforeEach(() => {
-    db = createTestDb();
+  beforeEach(async () => {
+    db = await createTestDb();
   });
 
-  it("returns null for missing key", async () => {
-    expect(await getState(db, "nonexistent")).toBeNull();
+  it("returns default state when no record exists", async () => {
+    const state = await getRiskState(db);
+    expect(state.tripped).toBe(false);
+    expect(state.consecutiveLosses).toBe(0);
+    expect(state.consecutiveErrors).toBe(0);
+    expect(state.dailyPnl).toBe(0);
+    expect(state.totalLossesToday).toBe(0);
   });
 
-  it("sets and retrieves a value", async () => {
-    await setState(db, "foo", { bar: 42 });
-    const val = await getState<{ bar: number }>(db, "foo");
-    expect(val).toEqual({ bar: 42 });
+  it("upserts and retrieves risk state", async () => {
+    await upsertRiskState(db, {
+      tripped: true,
+      consecutiveLosses: 3,
+      dailyPnl: -500,
+      lastTrippedAt: new Date().toISOString(),
+      cooldownUntil: new Date(Date.now() + 3_600_000).toISOString(),
+    });
+
+    const state = await getRiskState(db);
+    expect(state.tripped).toBe(true);
+    expect(state.consecutiveLosses).toBe(3);
+    expect(state.dailyPnl).toBeCloseTo(-500);
   });
 
-  it("upserts (overwrites) existing value", async () => {
-    await setState(db, "key", "first");
-    await setState(db, "key", "second");
-    expect(await getState(db, "key")).toBe("second");
+  it("upserts (overwrites) existing risk state", async () => {
+    await upsertRiskState(db, { consecutiveLosses: 1 });
+    await upsertRiskState(db, { consecutiveLosses: 5 });
+    const state = await getRiskState(db);
+    expect(state.consecutiveLosses).toBe(5);
   });
 
-  it("deleteState removes the key", async () => {
-    await setState(db, "to_delete", 123);
-    await deleteState(db, "to_delete");
-    expect(await getState(db, "to_delete")).toBeNull();
+  it("resetRiskState returns to defaults", async () => {
+    await upsertRiskState(db, { tripped: true, consecutiveLosses: 10 });
+    await resetRiskState(db);
+    const state = await getRiskState(db);
+    expect(state.tripped).toBe(false);
+    expect(state.consecutiveLosses).toBe(0);
   });
 
-  it("supports primitive and complex values", async () => {
-    await setState(db, "num", 99);
-    await setState(db, "arr", [1, 2, 3]);
-    expect(await getState(db, "num")).toBe(99);
-    expect(await getState(db, "arr")).toEqual([1, 2, 3]);
+  it("stores and retrieves lastDailyResetDate", async () => {
+    const today = "2026-04-01";
+    await upsertRiskState(db, { lastDailyResetDate: today });
+    const state = await getRiskState(db);
+    expect(state.lastDailyResetDate).toBe(today);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Circuit breaker state convenience wrappers
+// Circuit breaker backward-compat aliases
 // ---------------------------------------------------------------------------
 
-describe("getCircuitBreakerState / setCircuitBreakerState", () => {
+describe("getCircuitBreakerState / setCircuitBreakerState (backward-compat)", () => {
   let db: BotDatabase;
-  beforeEach(() => {
-    db = createTestDb();
+  beforeEach(async () => {
+    db = await createTestDb();
   });
 
   it("returns default state when not set", async () => {
     const state = await getCircuitBreakerState(db);
-    expect(state).toEqual(DEFAULT_CIRCUIT_BREAKER_STATE);
+    expect(state.tripped).toBe(false);
+    expect(state.consecutiveLosses).toBe(0);
+    expect(state.consecutiveErrors).toBe(0);
+    expect(state.dailyPnl).toBe(0);
   });
 
   it("persists and retrieves circuit breaker state", async () => {
@@ -570,11 +482,36 @@ describe("getCircuitBreakerState / setCircuitBreakerState", () => {
     expect(state.consecutiveLosses).toBe(2);
     expect(state.dailyPnl).toBeCloseTo(-100);
   });
+});
 
-  it("returns default when stored value is invalid JSON shape", async () => {
-    await setState(db, "circuit_breaker", { invalid: true });
-    const state = await getCircuitBreakerState(db);
-    expect(state).toEqual(DEFAULT_CIRCUIT_BREAKER_STATE);
+// ---------------------------------------------------------------------------
+// Circuit breaker per-account scoping
+// ---------------------------------------------------------------------------
+
+describe("circuit breaker per-account scoping", () => {
+  let db: BotDatabase;
+  beforeEach(async () => {
+    db = await createTestDb();
+  });
+
+  it("global and per-account circuit breaker states are independent", async () => {
+    const global = { ...DEFAULT_CIRCUIT_BREAKER_STATE, consecutiveLosses: 1 };
+    const account1 = { ...DEFAULT_CIRCUIT_BREAKER_STATE, consecutiveLosses: 2 };
+    const account2 = { ...DEFAULT_CIRCUIT_BREAKER_STATE, consecutiveLosses: 3 };
+
+    await setCircuitBreakerState(db, global);
+    await setCircuitBreakerState(db, account1, 1);
+    await setCircuitBreakerState(db, account2, 2);
+
+    expect((await getCircuitBreakerState(db)).consecutiveLosses).toBe(1);
+    expect((await getCircuitBreakerState(db, 1)).consecutiveLosses).toBe(2);
+    expect((await getCircuitBreakerState(db, 2)).consecutiveLosses).toBe(3);
+  });
+
+  it("returns default for uninitialized per-account state", async () => {
+    const state = await getCircuitBreakerState(db, 42);
+    expect(state.tripped).toBe(false);
+    expect(state.consecutiveLosses).toBe(0);
   });
 });
 
@@ -584,8 +521,8 @@ describe("getCircuitBreakerState / setCircuitBreakerState", () => {
 
 describe("getTickSummary", () => {
   let db: BotDatabase;
-  beforeEach(() => {
-    db = createTestDb();
+  beforeEach(async () => {
+    db = await createTestDb();
   });
 
   it("returns zeroes for empty database", async () => {
@@ -645,8 +582,8 @@ describe("getTickSummary", () => {
 
 describe("strategy CRUD", () => {
   let db: BotDatabase;
-  beforeEach(() => {
-    db = createTestDb();
+  beforeEach(async () => {
+    db = await createTestDb();
   });
 
   const STRATEGY_DATA = {
@@ -705,6 +642,7 @@ describe("strategy CRUD", () => {
 
   it("updateStrategy modifies fields and sets updatedAt", async () => {
     const id = await insertStrategy(db, STRATEGY_DATA);
+    const before = await getStrategy(db, id);
     await updateStrategy(db, id, {
       name: "Renamed Strategy",
       strategyType: "breakout",
@@ -713,8 +651,10 @@ describe("strategy CRUD", () => {
     const row = await getStrategy(db, id);
     expect(row!.name).toBe("Renamed Strategy");
     expect(row!.strategyType).toBe("breakout");
-    // updatedAt should have changed
-    expect(row!.updatedAt).not.toBe(NOW);
+    // updatedAt should be newer
+    expect(row!.updatedAt.getTime()).toBeGreaterThanOrEqual(
+      before!.updatedAt.getTime(),
+    );
   });
 
   it("updateStrategy can deactivate a strategy", async () => {
@@ -749,7 +689,10 @@ describe("strategy CRUD", () => {
     });
 
     const row = await getStrategy(db, id);
-    expect(row!.strategyParams).toEqual({ smaPeriodFast: 5, smaPeriodSlow: 20 });
+    expect(row!.strategyParams).toEqual({
+      smaPeriodFast: 5,
+      smaPeriodSlow: 20,
+    });
   });
 
   it("stores and retrieves JSON riskConfig", async () => {
@@ -768,7 +711,7 @@ describe("strategy CRUD", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Account CRUD operations
+// Account CRUD operations (no credentials)
 // ---------------------------------------------------------------------------
 
 describe("account CRUD", () => {
@@ -776,7 +719,7 @@ describe("account CRUD", () => {
   let strategyId: number;
 
   beforeEach(async () => {
-    db = createTestDb();
+    db = await createTestDb();
     strategyId = await insertStrategy(db, {
       name: "Test Strategy",
       prompt: "---\nstrategyType: breakout\n---\n\nTest.",
@@ -789,9 +732,6 @@ describe("account CRUD", () => {
   function accountData(overrides: Record<string, unknown> = {}) {
     return {
       name: "UK Indices Demo",
-      igApiKey: "test-api-key",
-      igUsername: "test-user",
-      igPassword: "test-pass",
       isDemo: true,
       strategyId,
       createdAt: NOW,
@@ -811,8 +751,6 @@ describe("account CRUD", () => {
     const row = await getAccount(db, id);
     expect(row).not.toBeNull();
     expect(row!.name).toBe("UK Indices Demo");
-    expect(row!.igApiKey).toBe("test-api-key");
-    expect(row!.igUsername).toBe("test-user");
     expect(row!.isDemo).toBe(true);
     expect(row!.strategyId).toBe(strategyId);
     expect(row!.intervalMinutes).toBe(15);
@@ -829,7 +767,7 @@ describe("account CRUD", () => {
     await insertAccount(db, accountData());
     const row = await getAccountByName(db, "UK Indices Demo");
     expect(row).not.toBeNull();
-    expect(row!.igUsername).toBe("test-user");
+    expect(row!.isDemo).toBe(true);
   });
 
   it("getAccountByName returns null for unknown name", async () => {
@@ -839,10 +777,13 @@ describe("account CRUD", () => {
 
   it("getActiveAccounts returns only active accounts", async () => {
     await insertAccount(db, accountData());
-    await insertAccount(db, accountData({
-      name: "Inactive Account",
-      isActive: false,
-    }));
+    await insertAccount(
+      db,
+      accountData({
+        name: "Inactive Account",
+        isActive: false,
+      }),
+    );
 
     const active = await getActiveAccounts(db);
     expect(active).toHaveLength(1);
@@ -851,6 +792,7 @@ describe("account CRUD", () => {
 
   it("updateAccount modifies fields and sets updatedAt", async () => {
     const id = await insertAccount(db, accountData());
+    const before = await getAccount(db, id);
     await updateAccount(db, id, {
       name: "Renamed Account",
       intervalMinutes: 60,
@@ -859,7 +801,9 @@ describe("account CRUD", () => {
     const row = await getAccount(db, id);
     expect(row!.name).toBe("Renamed Account");
     expect(row!.intervalMinutes).toBe(60);
-    expect(row!.updatedAt).not.toBe(NOW);
+    expect(row!.updatedAt.getTime()).toBeGreaterThanOrEqual(
+      before!.updatedAt.getTime(),
+    );
   });
 
   it("updateAccount can deactivate an account", async () => {
@@ -903,12 +847,15 @@ describe("account CRUD", () => {
   });
 
   it("stores custom interval and timezone", async () => {
-    const id = await insertAccount(db, accountData({
-      name: "US Account",
-      intervalMinutes: 5,
-      timezone: "America/New_York",
-      isDemo: false,
-    }));
+    const id = await insertAccount(
+      db,
+      accountData({
+        name: "US Account",
+        intervalMinutes: 5,
+        timezone: "America/New_York",
+        isDemo: false,
+      }),
+    );
 
     const row = await getAccount(db, id);
     expect(row!.intervalMinutes).toBe(5);
@@ -918,49 +865,16 @@ describe("account CRUD", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Circuit breaker per-account scoping
-// ---------------------------------------------------------------------------
-
-describe("circuit breaker per-account scoping", () => {
-  let db: BotDatabase;
-  beforeEach(() => {
-    db = createTestDb();
-  });
-
-  it("global and per-account circuit breaker states are independent", async () => {
-    const global = { ...DEFAULT_CIRCUIT_BREAKER_STATE, consecutiveLosses: 1 };
-    const account1 = { ...DEFAULT_CIRCUIT_BREAKER_STATE, consecutiveLosses: 2 };
-    const account2 = { ...DEFAULT_CIRCUIT_BREAKER_STATE, consecutiveLosses: 3 };
-
-    await setCircuitBreakerState(db, global);
-    await setCircuitBreakerState(db, account1, 1);
-    await setCircuitBreakerState(db, account2, 2);
-
-    expect((await getCircuitBreakerState(db)).consecutiveLosses).toBe(1);
-    expect((await getCircuitBreakerState(db, 1)).consecutiveLosses).toBe(2);
-    expect((await getCircuitBreakerState(db, 2)).consecutiveLosses).toBe(3);
-  });
-
-  it("returns default for uninitialized per-account state", async () => {
-    const state = await getCircuitBreakerState(db, 42);
-    expect(state).toEqual(DEFAULT_CIRCUIT_BREAKER_STATE);
-  });
-});
-
-// ---------------------------------------------------------------------------
 // getOpenPositions with accountId filter
 // ---------------------------------------------------------------------------
 
 describe("getOpenPositions with accountId filter", () => {
   let db: BotDatabase;
-  beforeEach(() => {
-    db = createTestDb();
+  beforeEach(async () => {
+    db = await createTestDb();
   });
 
   it("filters positions by accountId", async () => {
-    // Insert positions - some with accountId, some without
-    // We need to insert directly since InsertPositionSchema doesn't have accountId
-    // Use the db directly for these test inserts
     await insertPosition(db, {
       dealId: "DEAL_A1",
       epic: "EPIC_A",
@@ -992,5 +906,316 @@ describe("getOpenPositions with accountId filter", () => {
     // With accountId filter — since we didn't set accountId, filtering by 1 returns none
     const filtered = await getOpenPositions(db, 1);
     expect(filtered).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Instrument CRUD operations
+// ---------------------------------------------------------------------------
+
+describe("instrument CRUD", () => {
+  let db: BotDatabase;
+  beforeEach(async () => {
+    db = await createTestDb();
+  });
+
+  const INSTRUMENT_DATA = {
+    epic: "IX.D.FTSE.DAILY.IP",
+    name: "FTSE 100 DFB",
+    minDealSize: 0.5,
+    tickSize: 1.0,
+    marginFactor: 0.05,
+    currencyCode: "GBP",
+    expiry: "DFB",
+  };
+
+  it("insertInstrument returns a numeric id", async () => {
+    const id = await insertInstrument(db, INSTRUMENT_DATA);
+    expect(typeof id).toBe("number");
+    expect(id).toBeGreaterThan(0);
+  });
+
+  it("getInstrument retrieves by epic", async () => {
+    await insertInstrument(db, INSTRUMENT_DATA);
+    const row = await getInstrument(db, "IX.D.FTSE.DAILY.IP");
+    expect(row).not.toBeNull();
+    expect(row!.name).toBe("FTSE 100 DFB");
+    expect(row!.minDealSize).toBeCloseTo(0.5);
+    expect(row!.currencyCode).toBe("GBP");
+  });
+
+  it("getInstrument returns null for unknown epic", async () => {
+    const row = await getInstrument(db, "UNKNOWN");
+    expect(row).toBeNull();
+  });
+
+  it("upsertInstrument updates existing instrument", async () => {
+    await insertInstrument(db, INSTRUMENT_DATA);
+    await upsertInstrument(db, {
+      ...INSTRUMENT_DATA,
+      name: "FTSE 100 Updated",
+      minDealSize: 1.0,
+    });
+
+    const row = await getInstrument(db, "IX.D.FTSE.DAILY.IP");
+    expect(row!.name).toBe("FTSE 100 Updated");
+    expect(row!.minDealSize).toBeCloseTo(1.0);
+  });
+
+  it("upsertInstrument inserts new instrument", async () => {
+    await upsertInstrument(db, {
+      epic: "CS.D.AAPL.CFD.IP",
+      name: "Apple CFD",
+      minDealSize: 1,
+      currencyCode: "USD",
+    });
+
+    const row = await getInstrument(db, "CS.D.AAPL.CFD.IP");
+    expect(row).not.toBeNull();
+    expect(row!.name).toBe("Apple CFD");
+  });
+
+  it("getStaleInstruments returns instruments older than threshold", async () => {
+    await insertInstrument(db, INSTRUMENT_DATA);
+    // The default lastSyncedAt is now(), so querying for "older than tomorrow" should return it
+    const tomorrow = new Date(Date.now() + 86_400_000);
+    const stale = await getStaleInstruments(db, tomorrow);
+    expect(stale).toHaveLength(1);
+
+    // Querying for "older than yesterday" should return none
+    const yesterday = new Date(Date.now() - 86_400_000);
+    const fresh = await getStaleInstruments(db, yesterday);
+    expect(fresh).toHaveLength(0);
+  });
+
+  it("enforces unique epic constraint", async () => {
+    await insertInstrument(db, INSTRUMENT_DATA);
+    await expect(insertInstrument(db, INSTRUMENT_DATA)).rejects.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Account Snapshot operations
+// ---------------------------------------------------------------------------
+
+describe("account snapshot CRUD", () => {
+  let db: BotDatabase;
+  let accountId: number;
+
+  beforeEach(async () => {
+    db = await createTestDb();
+    const strategyId = await insertStrategy(db, {
+      name: "Test",
+      prompt: "test",
+      strategyType: "breakout",
+    });
+    accountId = await insertAccount(db, {
+      name: "Test Account",
+      strategyId,
+    });
+  });
+
+  it("insertAccountSnapshot returns a numeric id", async () => {
+    const id = await insertAccountSnapshot(db, {
+      accountId,
+      balance: 10000,
+      equity: 10500,
+      margin: 500,
+      profitLoss: 500,
+      availableFunds: 10000,
+    });
+    expect(id).toBeGreaterThan(0);
+  });
+
+  it("getRecentSnapshots returns snapshots in descending order", async () => {
+    await insertAccountSnapshot(db, {
+      accountId,
+      balance: 10000,
+      equity: 10000,
+      margin: 0,
+      profitLoss: 0,
+      availableFunds: 10000,
+    });
+    await insertAccountSnapshot(db, {
+      accountId,
+      balance: 10500,
+      equity: 10500,
+      margin: 0,
+      profitLoss: 500,
+      availableFunds: 10500,
+    });
+
+    const snapshots = await getRecentSnapshots(db, accountId, 10);
+    expect(snapshots).toHaveLength(2);
+    // Most recent first
+    expect(snapshots[0].balance).toBeCloseTo(10500);
+  });
+
+  it("getSnapshotsInRange filters by date", async () => {
+    await insertAccountSnapshot(db, {
+      accountId,
+      balance: 10000,
+      equity: 10000,
+      margin: 0,
+      profitLoss: 0,
+      availableFunds: 10000,
+    });
+
+    const from = new Date(Date.now() - 86_400_000);
+    const to = new Date(Date.now() + 86_400_000);
+    const inRange = await getSnapshotsInRange(db, accountId, from, to);
+    expect(inRange).toHaveLength(1);
+
+    // Range in the past
+    const pastFrom = new Date("2020-01-01");
+    const pastTo = new Date("2020-12-31");
+    const outOfRange = await getSnapshotsInRange(
+      db,
+      accountId,
+      pastFrom,
+      pastTo,
+    );
+    expect(outOfRange).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Candle operations
+// ---------------------------------------------------------------------------
+
+describe("candle CRUD", () => {
+  let db: BotDatabase;
+  beforeEach(async () => {
+    db = await createTestDb();
+  });
+
+  it("upsertCandles inserts new candles", async () => {
+    const now = new Date();
+    await upsertCandles(db, [
+      {
+        epic: "IX.D.FTSE.DAILY.IP",
+        resolution: "DAY",
+        timestamp: now.toISOString(),
+        open: 7500,
+        high: 7550,
+        low: 7450,
+        close: 7520,
+      },
+    ]);
+
+    const rows = await getCandles(db, "IX.D.FTSE.DAILY.IP", "DAY", 10);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].open).toBeCloseTo(7500);
+    expect(rows[0].close).toBeCloseTo(7520);
+  });
+
+  it("upsertCandles updates existing candles on conflict", async () => {
+    const ts = new Date("2026-04-01T12:00:00Z").toISOString();
+    await upsertCandles(db, [
+      {
+        epic: "EPIC_A",
+        resolution: "HOUR",
+        timestamp: ts,
+        open: 100,
+        high: 110,
+        low: 90,
+        close: 105,
+      },
+    ]);
+
+    // Upsert with updated close price
+    await upsertCandles(db, [
+      {
+        epic: "EPIC_A",
+        resolution: "HOUR",
+        timestamp: ts,
+        open: 100,
+        high: 115,
+        low: 88,
+        close: 112,
+      },
+    ]);
+
+    const rows = await getCandles(db, "EPIC_A", "HOUR", 10);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].close).toBeCloseTo(112);
+    expect(rows[0].high).toBeCloseTo(115);
+  });
+
+  it("upsertCandles handles empty array gracefully", async () => {
+    await upsertCandles(db, []);
+    const rows = await getCandles(db, "EPIC", "DAY", 10);
+    expect(rows).toHaveLength(0);
+  });
+
+  it("getCandleRange filters by date range", async () => {
+    const t1 = new Date("2026-04-01T10:00:00Z");
+    const t2 = new Date("2026-04-01T11:00:00Z");
+    const t3 = new Date("2026-04-01T12:00:00Z");
+
+    await upsertCandles(db, [
+      {
+        epic: "E",
+        resolution: "HOUR",
+        timestamp: t1.toISOString(),
+        open: 1,
+        high: 2,
+        low: 0,
+        close: 1.5,
+      },
+      {
+        epic: "E",
+        resolution: "HOUR",
+        timestamp: t2.toISOString(),
+        open: 2,
+        high: 3,
+        low: 1,
+        close: 2.5,
+      },
+      {
+        epic: "E",
+        resolution: "HOUR",
+        timestamp: t3.toISOString(),
+        open: 3,
+        high: 4,
+        low: 2,
+        close: 3.5,
+      },
+    ]);
+
+    const range = await getCandleRange(db, "E", "HOUR", t1, t2);
+    expect(range).toHaveLength(2);
+  });
+
+  it("pruneOldCandles removes candles older than threshold", async () => {
+    const old = new Date("2020-01-01T00:00:00Z");
+    const recent = new Date();
+
+    await upsertCandles(db, [
+      {
+        epic: "E",
+        resolution: "DAY",
+        timestamp: old.toISOString(),
+        open: 1,
+        high: 2,
+        low: 0,
+        close: 1,
+      },
+      {
+        epic: "E",
+        resolution: "DAY",
+        timestamp: recent.toISOString(),
+        open: 2,
+        high: 3,
+        low: 1,
+        close: 2,
+      },
+    ]);
+
+    await pruneOldCandles(db, new Date("2025-01-01T00:00:00Z"));
+
+    const rows = await getCandles(db, "E", "DAY", 10);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].close).toBeCloseTo(2);
   });
 });

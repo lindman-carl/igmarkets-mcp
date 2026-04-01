@@ -5,12 +5,7 @@
  * strategy runner, position sizer, circuit breaker, executor, and logger.
  */
 
-// ---------------------------------------------------------------------------
-// Schemas and types
-// ---------------------------------------------------------------------------
-
 export {
-  // Enums
   TickStatusSchema,
   SignalActionSchema,
   SignalTypeSchema,
@@ -19,7 +14,6 @@ export {
   OrderTypeSchema,
   TradeStatusSchema,
   PositionStatusSchema,
-  // Domain schemas
   IndicatorDataSchema,
   TickSchema,
   InsertTickSchema,
@@ -29,26 +23,26 @@ export {
   InsertTradeSchema,
   PositionSchema,
   InsertPositionSchema,
-  BotStateEntrySchema,
+  RiskStateSchema,
   CircuitBreakerStateSchema,
-  // Compound schemas
   WatchlistItemSchema,
   StrategyParamsSchema,
   RiskConfigSchema,
   CircuitBreakerConfigSchema,
   BotConfigSchema,
-  // Strategy / Account schemas
   StrategySchema,
   InsertStrategySchema,
   AccountSchema,
   InsertAccountSchema,
+  InsertInstrumentSchema,
+  InsertAccountSnapshotSchema,
+  InsertCandleSchema,
   StrategyPromptFrontmatterSchema,
-  // Defaults
   DEFAULT_STRATEGY_PARAMS,
   DEFAULT_RISK_CONFIG,
   DEFAULT_CIRCUIT_BREAKER_CONFIG,
   DEFAULT_CIRCUIT_BREAKER_STATE,
-  // Helpers
+  DEFAULT_RISK_STATE,
   parseBotConfig,
 } from "./schemas.js";
 
@@ -70,7 +64,7 @@ export type {
   InsertTrade,
   Position,
   InsertPosition,
-  BotStateEntry,
+  RiskState,
   CircuitBreakerState,
   WatchlistItem,
   StrategyParams,
@@ -81,61 +75,62 @@ export type {
   InsertStrategy,
   Account,
   InsertAccount,
+  InsertInstrument,
+  InsertAccountSnapshot,
+  InsertCandle,
   StrategyPromptFrontmatter,
   ParsedStrategyPrompt,
 } from "./schemas.js";
 
-// ---------------------------------------------------------------------------
-// State persistence
-// ---------------------------------------------------------------------------
-
 export {
-  // Tick operations
   startTick,
   completeTick,
   getLastTick,
   getRecentTicks,
-  // Signal operations
   insertSignal,
   markSignalActed,
   markSignalSkipped,
   getSignalsByTick,
   getRecentSignals,
-  // Trade operations
   insertTrade,
   updateTradeConfirmation,
   getTradesByTick,
   getRecentTrades,
   getTradesToday,
-  // Position operations
   insertPosition,
   getOpenPositions,
   getPositionByDealId,
   updatePositionLevels,
   closeTrackedPosition,
   getClosedPositions,
-  // Bot state (key-value)
-  getState,
-  setState,
-  deleteState,
-  // Circuit breaker state
+  getRiskState,
+  upsertRiskState,
+  resetRiskState,
   getCircuitBreakerState,
   setCircuitBreakerState,
-  // Strategy operations
   insertStrategy,
   getStrategy,
   getStrategyByName,
   getActiveStrategies,
   updateStrategy,
   deleteStrategy,
-  // Account operations
   insertAccount,
   getAccount,
   getAccountByName,
   getActiveAccounts,
   updateAccount,
   deleteAccount,
-  // Summary
+  insertInstrument,
+  getInstrument,
+  upsertInstrument,
+  getStaleInstruments,
+  insertAccountSnapshot,
+  getRecentSnapshots,
+  getSnapshotsInRange,
+  upsertCandles,
+  getCandles,
+  getCandleRange,
+  pruneOldCandles,
   getTickSummary,
 } from "./state.js";
 
@@ -146,11 +141,11 @@ export type {
   PositionRow,
   StrategyRow,
   AccountRow,
+  InstrumentRow,
+  AccountSnapshotRow,
+  CandleRow,
+  RiskStateRow,
 } from "./state.js";
-
-// ---------------------------------------------------------------------------
-// Strategy runner
-// ---------------------------------------------------------------------------
 
 export { runStrategy } from "./strategy-runner.js";
 
@@ -160,20 +155,12 @@ export type {
   StrategyContext,
 } from "./strategy-runner.js";
 
-// ---------------------------------------------------------------------------
-// Position sizer
-// ---------------------------------------------------------------------------
-
 export {
   calculatePositionSize,
   calculateTrailingStop,
 } from "./position-sizer.js";
 
 export type { SizingInput, SizingResult } from "./position-sizer.js";
-
-// ---------------------------------------------------------------------------
-// Circuit breaker
-// ---------------------------------------------------------------------------
 
 export {
   checkCircuitBreaker,
@@ -187,10 +174,6 @@ export {
 
 export type { CircuitBreakerCheck } from "./circuit-breaker.js";
 
-// ---------------------------------------------------------------------------
-// Executor
-// ---------------------------------------------------------------------------
-
 export { executeOpenTrade, executeCloseTrade } from "./executor.js";
 
 export type {
@@ -199,17 +182,9 @@ export type {
   ClosePositionParams,
 } from "./executor.js";
 
-// ---------------------------------------------------------------------------
-// Logger
-// ---------------------------------------------------------------------------
-
 export { createLogger, LOG_CATEGORIES } from "./logger.js";
 
 export type { LogLevel, LogEntry, Logger } from "./logger.js";
-
-// ---------------------------------------------------------------------------
-// Tick Orchestrator
-// ---------------------------------------------------------------------------
 
 export {
   executeTick,
@@ -227,14 +202,6 @@ export type {
   MultiAccountTickOptions,
 } from "./tick.js";
 
-// ---------------------------------------------------------------------------
-// Strategy Prompt Parser
-// ---------------------------------------------------------------------------
-
 export { parseStrategyPrompt, parseSimpleYaml } from "./prompt-parser.js";
-
-// ---------------------------------------------------------------------------
-// Configuration
-// ---------------------------------------------------------------------------
 
 export { loadBotConfig, buildCronExpression } from "./config.js";

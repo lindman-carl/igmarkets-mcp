@@ -54,8 +54,8 @@ import {
   getOpenPositions,
   getCircuitBreakerState,
   setCircuitBreakerState,
-  getState,
-  setState,
+  getRiskState,
+  upsertRiskState,
   updatePositionLevels,
   getActiveAccounts,
   getStrategy,
@@ -125,7 +125,8 @@ export async function executeTick(options: TickOptions): Promise<TickResult> {
   const startTime = Date.now();
   const config = parseBotConfig(options.config);
   const logger = options.logger ?? createLogger("info");
-  const db = options.db ?? createDatabaseWithMigrations(config.dbPath);
+  const db =
+    options.db ?? (await createDatabaseWithMigrations(config.databaseUrl));
   let client = options.client ?? null;
   const accountId = options.accountId ?? config.accountId;
 
@@ -139,7 +140,11 @@ export async function executeTick(options: TickOptions): Promise<TickResult> {
     // Step 1: Start tick record
     // ------------------------------------------------------------------
     const now = new Date().toISOString();
-    tickId = await startTick(db, { startedAt: now, status: "running" }, accountId);
+    tickId = await startTick(
+      db,
+      { startedAt: now, status: "running" },
+      accountId,
+    );
     logger.info(LOG_CATEGORIES.TICK, `Tick #${tickId} started`, {
       intervalMinutes: config.intervalMinutes,
       strategy: config.strategy,
@@ -301,19 +306,23 @@ export async function executeTick(options: TickOptions): Promise<TickResult> {
         for (const signal of signals) {
           signalsGenerated++;
 
-          const signalId = await insertSignal(db, {
-            tickId,
-            epic: signal.epic,
-            strategy: signal.strategy,
-            action: signal.action,
-            signalType: signal.signalType,
-            confidence: signal.confidence,
-            priceAtSignal: signal.priceAtSignal,
-            suggestedStop: signal.suggestedStop ?? undefined,
-            suggestedLimit: signal.suggestedLimit ?? undefined,
-            indicatorData: signal.indicatorData,
-            createdAt: new Date().toISOString(),
-          }, accountId);
+          const signalId = await insertSignal(
+            db,
+            {
+              tickId,
+              epic: signal.epic,
+              strategy: signal.strategy,
+              action: signal.action,
+              signalType: signal.signalType,
+              confidence: signal.confidence,
+              priceAtSignal: signal.priceAtSignal,
+              suggestedStop: signal.suggestedStop ?? undefined,
+              suggestedLimit: signal.suggestedLimit ?? undefined,
+              indicatorData: signal.indicatorData,
+              createdAt: new Date().toISOString(),
+            },
+            accountId,
+          );
 
           logger.info(
             LOG_CATEGORIES.SIGNAL,
@@ -543,9 +552,11 @@ export async function executeTick(options: TickOptions): Promise<TickResult> {
 // Helper: Database with Migrations
 // ---------------------------------------------------------------------------
 
-function createDatabaseWithMigrations(dbPath: string): BotDatabase {
-  runMigrations(dbPath);
-  return createDatabase(dbPath);
+async function createDatabaseWithMigrations(
+  databaseUrl: string,
+): Promise<BotDatabase> {
+  await runMigrations(databaseUrl);
+  return createDatabase(databaseUrl);
 }
 
 // ---------------------------------------------------------------------------
@@ -854,8 +865,6 @@ async function getMinDealSize(
 // Helper: Daily Reset
 // ---------------------------------------------------------------------------
 
-const LAST_RESET_DATE_KEY = "last_daily_reset";
-
 async function maybeResetDaily(
   db: BotDatabase,
   cbState: CircuitBreakerState,
@@ -863,18 +872,24 @@ async function maybeResetDaily(
   accountId?: number,
 ): Promise<CircuitBreakerState> {
   const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
-  const resetKey = accountId != null
-    ? `${LAST_RESET_DATE_KEY}:account:${accountId}`
-    : LAST_RESET_DATE_KEY;
-  const lastResetDate = await getState<string>(db, resetKey);
+
+  // Use the lastDailyResetDate from the risk_state row directly
+  const rState = await getRiskState(db, accountId ?? null);
+  const lastResetDate = rState.lastDailyResetDate;
 
   if (lastResetDate !== today) {
     logger.info(
       LOG_CATEGORIES.CIRCUIT_BREAKER,
       `New trading day: resetting daily counters`,
     );
-    await setState(db, resetKey, today);
-    return resetDaily(cbState);
+    const resetState = resetDaily(cbState);
+    // Persist the reset date alongside the reset state
+    await upsertRiskState(
+      db,
+      { ...resetState, lastDailyResetDate: today },
+      accountId ?? null,
+    );
+    return resetState;
   }
 
   return cbState;
@@ -921,8 +936,6 @@ export interface MultiAccountTickOptions {
   db: BotDatabase;
   /** Logger instance (if not provided, one is created). */
   logger?: Logger;
-  /** Path to the SQLite database file (used only if db is not provided). */
-  dbPath?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -1017,19 +1030,42 @@ export async function executeAccountTick(
     ...frontmatterRiskOverrides,
   };
 
-  // Build the BotConfig
+  // Build the BotConfig — credentials come from env, not the account row
+  const apiKey = process.env.IG_API_KEY;
+  const username = process.env.IG_USERNAME;
+  const password = process.env.IG_PASSWORD;
+
+  if (!apiKey || !username || !password) {
+    const missing = [
+      !apiKey && "IG_API_KEY",
+      !username && "IG_USERNAME",
+      !password && "IG_PASSWORD",
+    ].filter(Boolean);
+    return {
+      tickId: 0,
+      status: "error",
+      instrumentsScanned: 0,
+      signalsGenerated: 0,
+      tradesExecuted: 0,
+      error: `Missing required environment variables: ${missing.join(", ")}`,
+      durationMs: 0,
+    };
+  }
+
   const config: BotConfig = {
     intervalMinutes: account.intervalMinutes as 5 | 10 | 15 | 60,
     timezone: account.timezone,
-    apiKey: account.igApiKey,
-    username: account.igUsername,
-    password: account.igPassword,
+    apiKey,
+    username,
+    password,
     isDemo: account.isDemo,
     watchlist,
     strategy: strategyType,
     strategyParams,
     risk,
-    dbPath: "bot.db", // Not used since we pass db directly
+    databaseUrl:
+      process.env.DATABASE_URL ??
+      "postgresql://igmarkets:igmarkets@localhost:5432/igmarkets",
     accountId: account.id,
   };
 
@@ -1037,9 +1073,9 @@ export async function executeAccountTick(
   const client =
     options.client ??
     new IGClient({
-      apiKey: account.igApiKey,
-      username: account.igUsername,
-      password: account.igPassword,
+      apiKey,
+      username,
+      password,
       isDemo: account.isDemo,
     });
 
@@ -1195,7 +1231,8 @@ export async function executeAllAccountTicks(
     LOG_CATEGORIES.TICK,
     `Multi-account tick completed: ${results.length} accounts in ${durationMs}ms`,
     {
-      completed: results.filter((r) => r.tickResult.status === "completed").length,
+      completed: results.filter((r) => r.tickResult.status === "completed")
+        .length,
       skipped: results.filter((r) => r.tickResult.status === "skipped").length,
       errors: results.filter((r) => r.tickResult.status === "error").length,
     },

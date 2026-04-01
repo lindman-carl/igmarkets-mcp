@@ -14,7 +14,9 @@ import { parseStrategyPrompt, parseSimpleYaml } from "./prompt-parser.js";
 
 describe("parseSimpleYaml", () => {
   it("parses simple key-value pairs", () => {
-    const result = parseSimpleYaml(`name: "My Strategy"\nstrategyType: trend-following`);
+    const result = parseSimpleYaml(
+      `name: "My Strategy"\nstrategyType: trend-following`,
+    );
     expect(result.name).toBe("My Strategy");
     expect(result.strategyType).toBe("trend-following");
   });
@@ -135,7 +137,9 @@ Buy when SMA10 crosses above SMA20.
     const prompt = "## Just a plain markdown doc\n\nNo frontmatter here.";
     const result = parseStrategyPrompt(prompt);
     expect(result.frontmatter).toEqual({});
-    expect(result.body).toBe("## Just a plain markdown doc\n\nNo frontmatter here.");
+    expect(result.body).toBe(
+      "## Just a plain markdown doc\n\nNo frontmatter here.",
+    );
   });
 
   it("handles empty string", () => {
@@ -246,7 +250,9 @@ Body text.
     const result = parseStrategyPrompt(prompt);
     expect(result.frontmatter.strategyType).toBe("breakout");
     // Unknown keys should not appear
-    expect((result.frontmatter as Record<string, unknown>).unknownKey).toBeUndefined();
+    expect(
+      (result.frontmatter as Record<string, unknown>).unknownKey,
+    ).toBeUndefined();
   });
 
   it("throws on invalid frontmatter values (riskPerTrade > 0.1)", () => {

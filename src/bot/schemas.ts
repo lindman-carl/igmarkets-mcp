@@ -72,8 +72,8 @@ export type IndicatorData = z.infer<typeof IndicatorDataSchema>;
 
 export const TickSchema = z.object({
   id: z.optional(z.number()),
-  startedAt: z.string(),
-  completedAt: z.optional(z.nullable(z.string())),
+  startedAt: z.union([z.string(), z.date()]),
+  completedAt: z.optional(z.nullable(z.union([z.string(), z.date()]))),
   status: TickStatusSchema,
   instrumentsScanned: z.optional(z.number()),
   signalsGenerated: z.optional(z.number()),
@@ -84,7 +84,7 @@ export const TickSchema = z.object({
 export type Tick = z.infer<typeof TickSchema>;
 
 export const InsertTickSchema = z.object({
-  startedAt: z.string(),
+  startedAt: z.union([z.string(), z.date()]),
   status: TickStatusSchema.default("running"),
   metadata: z.optional(z.unknown()),
 });
@@ -108,7 +108,7 @@ export const SignalSchema = z.object({
   suggestedSize: z.optional(z.nullable(z.number())),
   acted: z.optional(z.boolean()),
   skipReason: z.optional(z.nullable(z.string())),
-  createdAt: z.string(),
+  createdAt: z.union([z.string(), z.date()]),
   indicatorData: z.optional(z.nullable(IndicatorDataSchema)),
 });
 export type Signal = z.infer<typeof SignalSchema>;
@@ -126,7 +126,7 @@ export const InsertSignalSchema = z.object({
   suggestedSize: z.optional(z.number()),
   acted: z.optional(z.boolean()),
   skipReason: z.optional(z.string()),
-  createdAt: z.string(),
+  createdAt: z.union([z.string(), z.date()]),
   indicatorData: z.optional(IndicatorDataSchema),
 });
 export type InsertSignal = z.infer<typeof InsertSignalSchema>;
@@ -152,7 +152,7 @@ export const TradeSchema = z.object({
   rejectReason: z.optional(z.nullable(z.string())),
   currencyCode: z.string(),
   expiry: z.string(),
-  createdAt: z.string(),
+  createdAt: z.union([z.string(), z.date()]),
   confirmationData: z.optional(z.nullable(z.unknown())),
 });
 export type Trade = z.infer<typeof TradeSchema>;
@@ -173,7 +173,7 @@ export const InsertTradeSchema = z.object({
   rejectReason: z.optional(z.string()),
   currencyCode: z.string(),
   expiry: z.string(),
-  createdAt: z.string(),
+  createdAt: z.union([z.string(), z.date()]),
   confirmationData: z.optional(z.unknown()),
 });
 export type InsertTrade = z.infer<typeof InsertTradeSchema>;
@@ -197,8 +197,8 @@ export const PositionSchema = z.object({
   realizedPnl: z.optional(z.nullable(z.number())),
   currencyCode: z.string(),
   expiry: z.string(),
-  openedAt: z.string(),
-  closedAt: z.optional(z.nullable(z.string())),
+  openedAt: z.union([z.string(), z.date()]),
+  closedAt: z.optional(z.nullable(z.union([z.string(), z.date()]))),
   openTradeId: z.optional(z.nullable(z.number())),
   closeTradeId: z.optional(z.nullable(z.number())),
   metadata: z.optional(z.nullable(z.unknown())),
@@ -217,39 +217,46 @@ export const InsertPositionSchema = z.object({
   status: PositionStatusSchema.default("open"),
   currencyCode: z.string(),
   expiry: z.string(),
-  openedAt: z.string(),
+  openedAt: z.union([z.string(), z.date()]),
   openTradeId: z.optional(z.number()),
   metadata: z.optional(z.unknown()),
 });
 export type InsertPosition = z.infer<typeof InsertPositionSchema>;
 
 // ---------------------------------------------------------------------------
-// Bot State (key-value)
+// Risk State (typed circuit breaker state, replaces bot_state KV)
 // ---------------------------------------------------------------------------
 
-export const BotStateEntrySchema = z.object({
-  key: z.string(),
-  value: z.unknown(),
-  updatedAt: z.string(),
-});
-export type BotStateEntry = z.infer<typeof BotStateEntrySchema>;
-
-// ---------------------------------------------------------------------------
-// Circuit Breaker State (stored in bot_state table)
-// ---------------------------------------------------------------------------
-
-export const CircuitBreakerStateSchema = z.object({
+export const RiskStateSchema = z.object({
+  id: z.optional(z.number()),
+  accountId: z.optional(z.nullable(z.number())),
   tripped: z.boolean(),
   consecutiveLosses: z.number(),
   consecutiveErrors: z.number(),
-  lastTrippedAt: z.optional(z.nullable(z.string())),
-  cooldownUntil: z.optional(z.nullable(z.string())),
+  lastTrippedAt: z.optional(z.nullable(z.union([z.string(), z.date()]))),
+  cooldownUntil: z.optional(z.nullable(z.union([z.string(), z.date()]))),
   totalLossesToday: z.number(),
   dailyPnl: z.number(),
+  lastDailyResetDate: z.optional(z.nullable(z.string())),
+  updatedAt: z.optional(z.union([z.string(), z.date()])),
 });
-export type CircuitBreakerState = z.infer<typeof CircuitBreakerStateSchema>;
+export type RiskState = z.infer<typeof RiskStateSchema>;
 
-export const DEFAULT_CIRCUIT_BREAKER_STATE: CircuitBreakerState = {
+export const InsertRiskStateSchema = z.object({
+  accountId: z.optional(z.nullable(z.number())),
+  tripped: z.boolean().default(false),
+  consecutiveLosses: z.number().default(0),
+  consecutiveErrors: z.number().default(0),
+  lastTrippedAt: z.optional(z.nullable(z.union([z.string(), z.date()]))),
+  cooldownUntil: z.optional(z.nullable(z.union([z.string(), z.date()]))),
+  totalLossesToday: z.number().default(0),
+  dailyPnl: z.number().default(0),
+  lastDailyResetDate: z.optional(z.nullable(z.string())),
+});
+export type InsertRiskState = z.infer<typeof InsertRiskStateSchema>;
+
+/** Default risk state for a new account / fresh start */
+export const DEFAULT_RISK_STATE: RiskState = {
   tripped: false,
   consecutiveLosses: 0,
   consecutiveErrors: 0,
@@ -257,7 +264,101 @@ export const DEFAULT_CIRCUIT_BREAKER_STATE: CircuitBreakerState = {
   cooldownUntil: null,
   totalLossesToday: 0,
   dailyPnl: 0,
+  lastDailyResetDate: null,
 };
+
+// Keep backward-compat alias for existing code that references CircuitBreakerState
+export type CircuitBreakerState = RiskState;
+export const CircuitBreakerStateSchema = RiskStateSchema;
+export const DEFAULT_CIRCUIT_BREAKER_STATE = DEFAULT_RISK_STATE;
+
+// ---------------------------------------------------------------------------
+// Instrument (local market master data cache)
+// ---------------------------------------------------------------------------
+
+export const InstrumentSchema = z.object({
+  id: z.optional(z.number()),
+  epic: z.string(),
+  name: z.string(),
+  minDealSize: z.number(),
+  tickSize: z.optional(z.nullable(z.number())),
+  marginFactor: z.optional(z.nullable(z.number())),
+  currencyCode: z.string(),
+  expiry: z.optional(z.nullable(z.string())),
+  tradingHours: z.optional(z.nullable(z.unknown())),
+  lastSyncedAt: z.optional(z.nullable(z.union([z.string(), z.date()]))),
+  createdAt: z.optional(z.union([z.string(), z.date()])),
+});
+export type Instrument = z.infer<typeof InstrumentSchema>;
+
+export const InsertInstrumentSchema = z.object({
+  epic: z.string(),
+  name: z.string(),
+  minDealSize: z.number(),
+  tickSize: z.optional(z.number()),
+  marginFactor: z.optional(z.number()),
+  currencyCode: z.string(),
+  expiry: z.optional(z.string()),
+  tradingHours: z.optional(z.unknown()),
+  lastSyncedAt: z.optional(z.union([z.string(), z.date()])),
+});
+export type InsertInstrument = z.infer<typeof InsertInstrumentSchema>;
+
+// ---------------------------------------------------------------------------
+// Account Snapshot (equity curve)
+// ---------------------------------------------------------------------------
+
+export const AccountSnapshotSchema = z.object({
+  id: z.optional(z.number()),
+  accountId: z.number(),
+  balance: z.number(),
+  equity: z.number(),
+  margin: z.number(),
+  profitLoss: z.number(),
+  availableFunds: z.number(),
+  snapshotAt: z.optional(z.union([z.string(), z.date()])),
+});
+export type AccountSnapshot = z.infer<typeof AccountSnapshotSchema>;
+
+export const InsertAccountSnapshotSchema = z.object({
+  accountId: z.number(),
+  balance: z.number(),
+  equity: z.number(),
+  margin: z.number().default(0),
+  profitLoss: z.number().default(0),
+  availableFunds: z.number().default(0),
+  snapshotAt: z.optional(z.union([z.string(), z.date()])),
+});
+export type InsertAccountSnapshot = z.infer<typeof InsertAccountSnapshotSchema>;
+
+// ---------------------------------------------------------------------------
+// Candle (price data cache)
+// ---------------------------------------------------------------------------
+
+export const CandleSchema = z.object({
+  id: z.optional(z.number()),
+  epic: z.string(),
+  resolution: z.string(),
+  timestamp: z.union([z.string(), z.date()]),
+  open: z.number(),
+  high: z.number(),
+  low: z.number(),
+  close: z.number(),
+  volume: z.optional(z.nullable(z.number())),
+});
+export type Candle = z.infer<typeof CandleSchema>;
+
+export const InsertCandleSchema = z.object({
+  epic: z.string(),
+  resolution: z.string(),
+  timestamp: z.union([z.string(), z.date()]),
+  open: z.number(),
+  high: z.number(),
+  low: z.number(),
+  close: z.number(),
+  volume: z.optional(z.number()),
+});
+export type InsertCandle = z.infer<typeof InsertCandleSchema>;
 
 // ---------------------------------------------------------------------------
 // Bot Configuration
@@ -343,8 +444,8 @@ export const StrategySchema = z.object({
   strategyParams: z.optional(z.nullable(z.unknown())),
   riskConfig: z.optional(z.nullable(z.unknown())),
   isActive: z.optional(z.boolean()),
-  createdAt: z.string(),
-  updatedAt: z.string(),
+  createdAt: z.union([z.string(), z.date()]),
+  updatedAt: z.union([z.string(), z.date()]),
 });
 export type Strategy = z.infer<typeof StrategySchema>;
 
@@ -355,43 +456,38 @@ export const InsertStrategySchema = z.object({
   strategyParams: z.optional(z.unknown()),
   riskConfig: z.optional(z.unknown()),
   isActive: z.optional(z.boolean()),
-  createdAt: z.string(),
-  updatedAt: z.string(),
+  createdAt: z.optional(z.union([z.string(), z.date()])),
+  updatedAt: z.optional(z.union([z.string(), z.date()])),
 });
 export type InsertStrategy = z.infer<typeof InsertStrategySchema>;
 
 // ---------------------------------------------------------------------------
-// Account (persisted in accounts table)
+// Account (persisted in accounts table — no credentials)
+// Credentials are read from env: IG_API_KEY, IG_USERNAME, IG_PASSWORD
 // ---------------------------------------------------------------------------
 
 export const AccountSchema = z.object({
   id: z.optional(z.number()),
   name: z.string().min(1),
-  igApiKey: z.string(),
-  igUsername: z.string(),
-  igPassword: z.string(),
   isDemo: z.optional(z.boolean()),
   strategyId: z.number(),
   intervalMinutes: z.optional(z.number().int()),
   timezone: z.optional(z.string()),
   isActive: z.optional(z.boolean()),
-  createdAt: z.string(),
-  updatedAt: z.string(),
+  createdAt: z.union([z.string(), z.date()]),
+  updatedAt: z.union([z.string(), z.date()]),
 });
 export type Account = z.infer<typeof AccountSchema>;
 
 export const InsertAccountSchema = z.object({
   name: z.string().min(1),
-  igApiKey: z.string(),
-  igUsername: z.string(),
-  igPassword: z.string(),
   isDemo: z.optional(z.boolean()),
   strategyId: z.number(),
   intervalMinutes: z.optional(z.number().int()),
   timezone: z.optional(z.string()),
   isActive: z.optional(z.boolean()),
-  createdAt: z.string(),
-  updatedAt: z.string(),
+  createdAt: z.optional(z.union([z.string(), z.date()])),
+  updatedAt: z.optional(z.union([z.string(), z.date()])),
 });
 export type InsertAccount = z.infer<typeof InsertAccountSchema>;
 
@@ -424,8 +520,10 @@ export const BotConfigSchema = z.object({
   /** Circuit breaker */
   circuitBreaker: z.optional(CircuitBreakerConfigSchema),
 
-  /** Path to SQLite database file */
-  dbPath: z.string().default("bot.db"),
+  /** PostgreSQL connection URL */
+  databaseUrl: z
+    .string()
+    .default("postgresql://igmarkets:igmarkets@localhost:5432/igmarkets"),
 
   /** Optional account ID (for multi-account mode) */
   accountId: z.optional(z.number()),

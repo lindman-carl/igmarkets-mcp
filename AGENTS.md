@@ -277,7 +277,7 @@ full documentation.
 - **Scheduled task**: `trading-bot` (cron, every 15min during market hours)
 - **Scheduled task**: `trading-bot-multi` (multi-account, cron, every 15min during market hours)
 - **Manual task**: `trading-bot-manual` (on-demand testing)
-- **Database**: SQLite via Drizzle ORM (`bot.db`)
+- **Database**: PostgreSQL 18 via Docker + Drizzle ORM (connection URL from `DATABASE_URL` env var)
 - **Strategies**: `trend-following`, `breakout`, `mean-reversion`, `sentiment-contrarian`
 
 ### Bot Source Files
@@ -292,31 +292,46 @@ full documentation.
 | `src/bot/position-sizer.ts`  | Risk-based position sizing          |
 | `src/bot/executor.ts`        | Trade execution + confirmation      |
 | `src/bot/circuit-breaker.ts` | Safety circuit breaker              |
-| `src/bot/state.ts`           | SQLite persistence CRUD             |
+| `src/bot/state.ts`           | PostgreSQL persistence CRUD         |
 | `src/bot/prompt-parser.ts`   | Strategy prompt parser (YAML + MD)  |
 | `src/bot/logger.ts`          | Structured trade journal            |
 | `src/lib/indicators.ts`      | Technical indicators (SMA, ATR, BB) |
 | `src/db/schema.ts`           | Drizzle ORM table definitions       |
 
-### Database Schema (7 tables)
+### Database Schema (10 tables)
 
-| Table        | Purpose                                              |
-| ------------ | ---------------------------------------------------- |
-| `strategies` | Named strategy configs with markdown prompt + params |
-| `accounts`   | IG trading accounts, each linked to a strategy       |
-| `ticks`      | One row per bot execution cycle                      |
-| `signals`    | Strategy signals generated during ticks              |
-| `trades`     | Executed trade operations and outcomes               |
-| `positions`  | Tracked open positions and their lifecycle           |
-| `bot_state`  | Key-value store for misc state (circuit breaker)     |
+| Table               | Purpose                                               |
+| ------------------- | ----------------------------------------------------- |
+| `strategies`        | Named strategy configs with markdown prompt + params  |
+| `accounts`          | Trading accounts (no credentials), linked to strategy |
+| `instruments`       | Market master data (epic, min deal size, margin)      |
+| `account_snapshots` | Equity curve snapshots per account                    |
+| `candles`           | Price data cache (OHLCV by epic + resolution)         |
+| `ticks`             | One row per bot execution cycle                       |
+| `signals`           | Strategy signals generated during ticks               |
+| `trades`            | Executed trade operations and outcomes                |
+| `positions`         | Tracked open positions and their lifecycle            |
+| `risk_state`        | Typed circuit breaker state per account               |
 
 The `ticks`, `signals`, `trades`, and `positions` tables have a nullable
 `account_id` column for multi-account scoping. `NULL` means legacy
 single-account mode.
 
+### Credentials
+
+All accounts share IG credentials from environment variables:
+
+- `IG_API_KEY`
+- `IG_USERNAME`
+- `IG_PASSWORD`
+
+The `accounts` table does **not** store credentials. The `isDemo` flag on each
+account controls whether the demo or live IG API endpoint is used.
+
 ### Multi-Account / Strategy Layer
 
 Each **strategy** has:
+
 - A unique `name`
 - A markdown `prompt` with YAML frontmatter (tickers, risk params, strategy type)
 - A `strategyType` (e.g. "trend-following", "breakout", or custom)
@@ -324,8 +339,9 @@ Each **strategy** has:
 - An `isActive` flag
 
 Each **account** has:
+
 - A unique `name` (e.g. "UK Indices Demo")
-- IG credentials (`igApiKey`, `igUsername`, `igPassword`, `isDemo`)
+- An `isDemo` flag (demo vs live IG API endpoint)
 - A `strategyId` FK linking to a strategy
 - Tick interval and timezone config
 - An `isActive` flag
@@ -377,6 +393,7 @@ each account's linked strategy, and call `executeAccountTick()` sequentially
 against `StrategyNameSchema` and fall back to `"trend-following"`.
 
 Config resolution order (highest priority first):
+
 1. Strategy prompt YAML frontmatter (`tickers`, `riskPerTrade`, `strategyType`)
 2. Strategy row columns (`strategyParams`, `riskConfig`, `strategyType`)
 3. Default constants (`DEFAULT_STRATEGY_PARAMS`, `DEFAULT_RISK_CONFIG`)
@@ -384,13 +401,31 @@ Config resolution order (highest priority first):
 The daily reset key for circuit breaker is scoped per-account:
 `last_daily_reset:account:{id}`
 
+### Bot Source Files
+
+| File                         | Purpose                             |
+| ---------------------------- | ----------------------------------- |
+| `src/trigger/trading-bot.ts` | Trigger.dev task definitions        |
+| `src/bot/tick.ts`            | Main tick orchestrator              |
+| `src/bot/config.ts`          | Config loader (file + env)          |
+| `src/bot/schemas.ts`         | Zod v4 schemas and types            |
+| `src/bot/strategy-runner.ts` | 4 strategy implementations          |
+| `src/bot/position-sizer.ts`  | Risk-based position sizing          |
+| `src/bot/executor.ts`        | Trade execution + confirmation      |
+| `src/bot/circuit-breaker.ts` | Safety circuit breaker              |
+| `src/bot/state.ts`           | PostgreSQL persistence CRUD         |
+| `src/bot/prompt-parser.ts`   | Strategy prompt parser (YAML + MD)  |
+| `src/bot/logger.ts`          | Structured trade journal            |
+| `src/lib/indicators.ts`      | Technical indicators (SMA, ATR, BB) |
+| `src/db/schema.ts`           | Drizzle ORM table definitions       |
+
 ### Trigger.dev Tasks (trading-bot.ts)
 
-| Task ID               | Type      | Description                                  |
-| --------------------- | --------- | -------------------------------------------- |
-| `trading-bot`         | Scheduled | Original single-account tick (cron)          |
-| `trading-bot-multi`   | Scheduled | Multi-account tick — iterates active accounts|
-| `trading-bot-manual`  | Manual    | On-demand single tick for testing            |
+| Task ID              | Type      | Description                                   |
+| -------------------- | --------- | --------------------------------------------- |
+| `trading-bot`        | Scheduled | Original single-account tick (cron)           |
+| `trading-bot-multi`  | Scheduled | Multi-account tick — iterates active accounts |
+| `trading-bot-manual` | Manual    | On-demand single tick for testing             |
 
 All tasks use `maxAttempts: 1` to prevent duplicate trades on retry.
 
@@ -398,7 +433,7 @@ All tasks use `maxAttempts: 1` to prevent duplicate trades on retry.
 
 - The bot uses **its own `IGClient` instance** — not the plugin's `getClient()` singleton
 - **Zod v4** schemas — import from `"zod/v4"`
-- **Drizzle ORM** with `better-sqlite3` for state persistence
+- **Drizzle ORM** with `pg` (node-postgres) for state persistence
 - **No retries** on Trigger.dev tasks (`maxAttempts: 1`) to prevent duplicate trades
 - **Demo mode by default** (`isDemo: true`)
 - All `.ts` files use **`.js` extension imports** (Node16 module resolution)

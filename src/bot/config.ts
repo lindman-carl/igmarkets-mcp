@@ -14,11 +14,6 @@ import { resolve } from "node:path";
 import { parseBotConfig } from "./schemas.js";
 import type { BotConfig } from "./schemas.js";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-/** Partial config that can come from environment variables. */
 interface EnvConfig {
   apiKey?: string;
   username?: string;
@@ -26,25 +21,9 @@ interface EnvConfig {
   isDemo?: boolean;
   strategy?: string;
   intervalMinutes?: number;
-  dbPath?: string;
+  databaseUrl?: string;
 }
 
-// ---------------------------------------------------------------------------
-// Environment Variable Loader
-// ---------------------------------------------------------------------------
-
-/**
- * Extract bot config values from environment variables.
- *
- * Supported variables:
- *   IG_API_KEY      — IG Markets API key
- *   IG_USERNAME     — IG account username/identifier
- *   IG_PASSWORD     — IG account password
- *   IG_DEMO         — "true" | "false" (default: true)
- *   BOT_STRATEGY    — Strategy name
- *   BOT_INTERVAL    — Tick interval in minutes (5, 10, 15, 60)
- *   BOT_DB_PATH     — Path to SQLite database file
- */
 function loadFromEnv(): EnvConfig {
   const env: EnvConfig = {};
 
@@ -61,14 +40,10 @@ function loadFromEnv(): EnvConfig {
       env.intervalMinutes = parsed;
     }
   }
-  if (process.env.BOT_DB_PATH) env.dbPath = process.env.BOT_DB_PATH;
+  if (process.env.DATABASE_URL) env.databaseUrl = process.env.DATABASE_URL;
 
   return env;
 }
-
-// ---------------------------------------------------------------------------
-// File Loader
-// ---------------------------------------------------------------------------
 
 /**
  * Load config from a JSON file.
@@ -89,10 +64,6 @@ function loadFromFile(configPath?: string): Record<string, unknown> | null {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Main Config Loader
-// ---------------------------------------------------------------------------
-
 /**
  * Load and validate bot configuration from all available sources.
  *
@@ -111,13 +82,9 @@ export function loadBotConfig(
   configFilePath?: string,
 ): BotConfig &
   Required<Pick<BotConfig, "strategyParams" | "risk" | "circuitBreaker">> {
-  // Layer 1: File config
   const fileConfig = loadFromFile(configFilePath) ?? {};
-
-  // Layer 2: Environment variables
   const envConfig = loadFromEnv();
 
-  // Merge: file → env → overrides
   const merged = {
     ...fileConfig,
     ...stripUndefined(envConfig as Record<string, unknown>),
@@ -126,10 +93,6 @@ export function loadBotConfig(
 
   return parseBotConfig(merged);
 }
-
-// ---------------------------------------------------------------------------
-// Helper: Build Cron Expression
-// ---------------------------------------------------------------------------
 
 /**
  * Build a cron expression for the given interval, optionally scoped to
@@ -148,18 +111,12 @@ export function buildCronExpression(
     return `*/${intervalMinutes} * * * *`;
   }
 
-  // Market hours: Mon–Fri, 08:00–16:30 London time
-  // (We use 8–16 hour range; the 16:30 close is covered by the 16:xx run)
   if (intervalMinutes === 60) {
     return "0 8-16 * * 1-5";
   }
 
   return `*/${intervalMinutes} 8-16 * * 1-5`;
 }
-
-// ---------------------------------------------------------------------------
-// Helper: Strip undefined values from an object
-// ---------------------------------------------------------------------------
 
 function stripUndefined(obj: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {};

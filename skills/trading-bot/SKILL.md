@@ -240,7 +240,7 @@ Fades extreme IG client sentiment readings.
    - Confirm demo mode
    - Use default risk/circuit breaker settings to start
 2. Verify IG credentials work: `ig_login` then `ig_session_status`
-3. Run database migration: `npm run db:migrate`
+3. Run database migration: `pnpm run db:migrate`
 4. Update `trigger.config.ts` with their project ref
 5. Deploy: `npx trigger.dev deploy`
 
