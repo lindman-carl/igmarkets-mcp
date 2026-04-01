@@ -58,7 +58,7 @@ Add to your `openclaw.json`:
 Ask your AI agent to look up a market, check positions, or open a trade. The
 plugin auto-authenticates at startup if credentials are configured.
 
-```
+```text
 > Search for Apple stock on IG Markets
 > Show me my open positions
 > What's the current FTSE 100 price?
@@ -103,7 +103,7 @@ Markets API.
 
 ### Architecture
 
-```
+```bash
 Trigger.dev (cron schedule)
   |
   v
@@ -333,7 +333,7 @@ Database files are excluded from git (see `.gitignore`).
 
 ### Project Structure
 
-```
+```bash
 igmarkets-mcp/
   index.ts                    # Plugin entry point
   trigger.config.ts           # Trigger.dev configuration
