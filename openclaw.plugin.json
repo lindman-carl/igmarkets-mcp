@@ -60,7 +60,14 @@
       "ig_repeat_deal_window"
     ]
   },
-  "skills": ["./skills/igmarkets"],
+  "skills": [
+    "./skills/igmarkets",
+    "./skills/portfolio-management",
+    "./skills/cfd-trading",
+    "./skills/market-analysis",
+    "./skills/risk-management",
+    "./skills/trading-strategies"
+  ],
   "uiHints": {
     "apiKey": {
       "label": "IG API Key",

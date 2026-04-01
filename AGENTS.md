@@ -228,6 +228,28 @@ If the session expires, call `ig_refresh_token` (v3) or re-login.
 | `ig_disable_application` | Disable an API application               |
 | `ig_repeat_deal_window`  | Get repeat deal window info              |
 
+## Trading Skills
+
+The plugin includes specialized skills for higher-level trading workflows. These
+provide opinionated, step-by-step guidance beyond the basic tool reference.
+
+| Skill                  | Directory                      | Use When                                                           |
+| ---------------------- | ------------------------------ | ------------------------------------------------------------------ |
+| `igmarkets`            | `skills/igmarkets/`            | General tool reference and basic workflows                         |
+| `portfolio-management` | `skills/portfolio-management/` | Portfolio review, P&L analysis, exposure, rebalancing              |
+| `cfd-trading`          | `skills/cfd-trading/`          | Opening/closing CFDs, margin, leverage, DFB, spread bets           |
+| `market-analysis`      | `skills/market-analysis/`      | Price analysis, sentiment, multi-timeframe review, screening       |
+| `risk-management`      | `skills/risk-management/`      | Position sizing, stop strategies, risk/reward, portfolio risk      |
+| `trading-strategies`   | `skills/trading-strategies/`   | Systematic strategies: trend, breakout, mean-reversion, contrarian |
+
+Skills are composable. For example, a typical trade flow uses:
+
+1. **market-analysis** to research the instrument
+2. **trading-strategies** to identify an entry signal
+3. **risk-management** to size the position and set stops
+4. **cfd-trading** to execute the trade
+5. **portfolio-management** to monitor the overall portfolio
+
 ## Key IG Concepts
 
 - **Epic**: Unique market identifier (e.g. "IX.D.FTSE.DAILY.IP", "CS.D.AAPL.CFD.IP")
