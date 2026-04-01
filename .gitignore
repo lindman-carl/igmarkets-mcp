@@ -2,7 +2,7 @@ node_modules/
 dist/
 *.tsbuildinfo
 .env
-.plan/
+.plan
 
 # PostgreSQL data (Docker volume)
 data/
