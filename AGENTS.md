@@ -7,7 +7,7 @@ are prefixed with `ig_`.
 ## Installation
 
 ```bash
-openclaw plugins install openclaw-plugin-igmarkets
+openclaw plugins install igmarkets
 ```
 
 Or install from a local directory:

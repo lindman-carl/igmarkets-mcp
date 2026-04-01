@@ -1,5 +1,5 @@
 {
-  "name": "openclaw-plugin-igmarkets",
+  "name": "igmarkets",
   "version": "1.0.0",
   "description": "OpenClaw plugin for IG Markets REST Trading API - 53 tools for trading, market data, and account management",
   "type": "module",

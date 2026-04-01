@@ -1,5 +1,5 @@
 {
-  "id": "openclaw-plugin-igmarkets",
+  "id": "igmarkets",
   "name": "IG Markets Trading",
   "description": "Trade stocks, CFDs, and spread bets via the IG Markets REST API. 53 tools for authentication, positions, orders, market data, watchlists, sentiment, and more.",
   "version": "1.0.0",
