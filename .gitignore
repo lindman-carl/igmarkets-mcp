@@ -3,6 +3,8 @@ dist/
 *.tsbuildinfo
 .env
 .plan
+plan
+coverage
 
 # PostgreSQL data (Docker volume)
 data/
@@ -16,3 +18,4 @@ data/
 package-lock.json
 
 
+/
